@@ -77,6 +77,21 @@ async function getStaticGalleryAlbums() {
   return parseStaticGallery(readBuildManifest());
 }
 
+function getBlogDescription(blog) {
+  const description = blog.seo || blog.excerpt;
+  if (typeof description === "string" && description.trim()) {
+    return description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+  }
+  const text = articleText(blog.content);
+  if (text) return text.slice(0, 300);
+  return blog.title || "Read the latest article from Abhyudaya Club.";
+}
+
+function getBlogSocialImage(blog) {
+  const value = blog.featuredImage || blog.image;
+  return getPublicHttpsUrl(value) || `${BASE_URL}/abhyudaya-logo.png`;
+}
+
 /* =========================================================
    Firebase Admin Initialization
 ========================================================= */
@@ -478,8 +493,45 @@ function injectMeta(htmlTemplate, meta) {
     setMeta("property", "og:type", meta.type);
   }
 
+  if (meta.galleryAlbum) {
+    const album = meta.galleryAlbum;
+    const albumUrl = `${BASE_URL}/gallery/${encodeURIComponent(album.slug)}`;
+    const images = (Array.isArray(album.photos) ? album.photos : [])
+      .filter((photo) => !photo.isVideo)
+      .map((photo) => getPublicImageUrl(photo.src || photo.thumbnailSrc || photo.rawSrc))
+      .filter(Boolean);
+
+    const schemaTag = gallerySchemaMarkup(
+      album.title,
+      album.description,
+      albumUrl,
+      images
+    );
+    const breadcrumbTag = breadcrumbSchemaMarkup([
+      { name: "Home", url: BASE_URL },
+      { name: "Gallery", url: `${BASE_URL}/gallery` },
+      { name: album.title, url: albumUrl },
+    ]);
+    html = replaceOrAppendHeadTag(html, /<\/head>/i, `    ${schemaTag}\n    ${breadcrumbTag}\n  </head>`);
+  } else if (Array.isArray(meta.galleryAlbums)) {
+    const images = meta.galleryAlbums
+      .map((album) => getPublicImageUrl(album.coverImage || album.photos?.[0]?.src))
+      .filter(Boolean);
+    const schemaTag = gallerySchemaMarkup(
+      "Photography Archive & Event Albums",
+      "Explore curated annual event photography albums and collections from Abhyudaya Club at MPEC Kanpur.",
+      `${BASE_URL}/gallery`,
+      images
+    );
+    const breadcrumbTag = breadcrumbSchemaMarkup([
+      { name: "Home", url: BASE_URL },
+      { name: "Gallery", url: `${BASE_URL}/gallery` },
+    ]);
+    html = replaceOrAppendHeadTag(html, /<\/head>/i, `    ${schemaTag}\n    ${breadcrumbTag}\n  </head>`);
+  }
+
   /*
-   * Lightweight fallback for crawlers without JS.
+   * Server-rendered semantic fallback for search engine crawlers and users.
    */
 
   if (meta.path !== "/" && !meta.blog && !meta.blogListing) {
@@ -488,19 +540,20 @@ function injectMeta(htmlTemplate, meta) {
       : Array.isArray(meta.galleryAlbums)
         ? renderGalleryListingFallback(meta.galleryAlbums)
         : "";
-    const noscriptContent = `
-      <noscript>
-        ${galleryContent || `<div style="padding:2rem;font-family:sans-serif;max-width:800px;margin:0 auto;">
-          <h1>${escapeHtml(meta.title || "Abhyudaya Club")}</h1>
-          <p>${escapeHtml(meta.description || "Abhyudaya Club — Science & Literary Club of MPEC Kanpur")}</p>
-        </div>`}
-      </noscript>
-    `;
 
-    const rootContent = galleryContent
-      ? galleryContent
-      : noscriptContent;
-    html = html.replace(/<div id=["']root["']><\/div>/i, `<div id="root">${rootContent}</div>`);
+    if (galleryContent) {
+      html = html.replace(/<div id=["']root["']><\/div>/i, `<div id="root">${galleryContent}</div>`);
+    } else {
+      const noscriptFallback = `
+        <noscript>
+          <div style="padding:2rem;font-family:sans-serif;max-width:800px;margin:0 auto;">
+            <h1>${escapeHtml(meta.title || "Abhyudaya Club")}</h1>
+            <p>${escapeHtml(meta.description || "Abhyudaya Club — Science & Literary Club of MPEC Kanpur")}</p>
+          </div>
+        </noscript>
+      `;
+      html = html.replace(/<div id=["']root["']><\/div>/i, `<div id="root">${noscriptFallback}</div>`);
+    }
   }
 
   return html;
@@ -519,20 +572,7 @@ function renderGalleryListingFallback(albums) {
     return [`<li><a href="${escapeHtml(href)}">${image}<span>${escapeHtml(album.title)}</span></a>${album.description ? `<p>${escapeHtml(album.description)}</p>` : ""}</li>`];
   });
 
-  const images = albums
-    .map((album) => getPublicImageUrl(album.coverImage || album.photos?.[0]?.src))
-    .filter(Boolean);
-  const schema = gallerySchemaMarkup(
-    "Abhyudaya Club Event Photography Archive",
-    "Browse event photographs and album collections from Abhyudaya Club at MPEC Kanpur.",
-    `${BASE_URL}/gallery`,
-    images
-  );
-  const breadcrumbs = breadcrumbSchemaMarkup([
-    { name: "Home", url: BASE_URL },
-    { name: "Gallery", url: `${BASE_URL}/gallery` },
-  ]);
-  return `${schema}${breadcrumbs}<main class="prerender-gallery-content" style="padding:2rem;font-family:sans-serif;max-width:1200px;margin:0 auto;"><h1>Photography Archive &amp; Event Albums</h1><p>Explore event photographs from Abhyudaya Club at MPEC Kanpur.</p><ul>${entries.join("")}</ul></main>`;
+  return `<main class="prerender-gallery-content" style="padding:2rem;font-family:sans-serif;max-width:1200px;margin:0 auto;"><h1>Photography Archive &amp; Event Albums</h1><p>Explore event photographs from Abhyudaya Club at MPEC Kanpur.</p><ul>${entries.join("")}</ul></main>`;
 }
 
 function renderGalleryAlbumFallback(album) {
@@ -541,37 +581,22 @@ function renderGalleryAlbumFallback(album) {
     .flatMap((photo, index) => {
       const imageUrl = getPublicImageUrl(photo.src || photo.thumbnailSrc || photo.rawSrc);
       if (!imageUrl) return [];
-      const title = photo.title || `${album.title || "Event album"} photo ${index + 1}`;
+      const title = photo.title || `${album.title || "Event album"} — Photo ${index + 1}`;
       return [`<figure><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}"${getImageDimensions(photo.width, photo.height)} loading="${index === 0 ? "eager" : "lazy"}"><figcaption>${escapeHtml(title)}</figcaption></figure>`];
     });
 
-  const images = (Array.isArray(album.photos) ? album.photos : [])
-    .filter((photo) => !photo.isVideo)
-    .map((photo) => getPublicImageUrl(photo.src || photo.thumbnailSrc || photo.rawSrc))
-    .filter(Boolean);
-  const albumUrl = `${BASE_URL}/gallery/${encodeURIComponent(album.slug)}`;
-  const schema = gallerySchemaMarkup(
-    album.title,
-    album.description,
-    albumUrl,
-    images
-  );
-  const breadcrumbs = breadcrumbSchemaMarkup([
-    { name: "Home", url: BASE_URL },
-    { name: "Gallery", url: `${BASE_URL}/gallery` },
-    { name: album.title, url: albumUrl },
-  ]);
-  return `${schema}${breadcrumbs}<main class="prerender-gallery-content" style="padding:2rem;font-family:sans-serif;max-width:1200px;margin:0 auto;"><p><a href="/gallery">Back to all event albums</a></p><h1>${escapeHtml(album.title || "Event Album")}</h1><p>${escapeHtml(album.description || "")}</p>${photos.join("")}</main>`;
+  return `<main class="prerender-gallery-content" style="padding:2rem;font-family:sans-serif;max-width:1200px;margin:0 auto;"><p><a href="/gallery">Back to all event albums</a></p><h1>${escapeHtml(album.title || "Event Album")}</h1><p>${escapeHtml(album.description || "")}</p>${photos.join("")}</main>`;
 }
 
 function gallerySchemaMarkup(name, description, url, images) {
   const schema = {
     "@context": "https://schema.org",
-    "@type": "ImageGallery",
+    "@type": "CollectionPage",
     name,
     description,
     url,
     image: unique(images),
+    primaryImageOfPage: images[0] || undefined,
   };
   return `<script type="application/ld+json">${JSON.stringify(schema).replace(/</g, "\\u003c")}</script>`;
 }

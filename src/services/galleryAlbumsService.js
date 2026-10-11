@@ -166,6 +166,47 @@ export async function getGalleryAlbums({ category = "all", search = "", year = "
   return toAlbumCards(filtered);
 }
 
+function formatAlbumDetail(album) {
+  if (!album) return null;
+  const optimizedPhotos = (album.photos || []).map((photo, index) => {
+    const rawUrl = photo.src || photo.rawSrc || photo.thumbnailSrc || "";
+    return {
+      id: photo.id || `photo-${index}`,
+      title: photo.title || `${album.title} — Photo ${index + 1}`,
+      description: photo.description || album.description || "",
+      thumbnailSrc: getCloudinaryThumbnail(rawUrl),
+      fullSrc: getCloudinaryFullImage(rawUrl),
+      rawSrc: photo.rawSrc || photo.src || rawUrl,
+      src: photo.src || rawUrl,
+      width: Number(photo.width) || 1200,
+      height: Number(photo.height) || 800,
+      aspectRatio: photo.aspectRatio || "3/2",
+      isVideo: Boolean(photo.isVideo),
+    };
+  });
+
+  return {
+    ...album,
+    category: normalizeCategory(album.category),
+    date: formatDisplayDate(album.date),
+    coverThumbnail: getCloudinaryThumbnail(album.coverImage),
+    photos: optimizedPhotos,
+    photoCount: optimizedPhotos.length,
+  };
+}
+
+/**
+ * Synchronously retrieves and formats an album if already available in memory cache or STATIC_ALBUMS.
+ * Allows instant first-frame render on client without empty skeleton flash.
+ */
+export function getSynchronousAlbumBySlug(slug) {
+  if (!slug) return null;
+  const all = _albumsCache || STATIC_ALBUMS;
+  const album = all.find((a) => a.slug === slug || a.id === slug);
+  if (!album) return null;
+  return formatAlbumDetail(album);
+}
+
 /**
  * Fetches full album details including all event photos for the dedicated /gallery/:eventSlug page.
  */
@@ -195,28 +236,7 @@ export async function getAlbumBySlug(slug) {
   const album = all.find((a) => a.slug === slug || a.id === slug);
 
   if (!album) return null;
-
-  // Prepare photos with both thumbnail and full-resolution Cloudinary URLs
-  const optimizedPhotos = (album.photos || []).map((photo, index) => ({
-    id: photo.id || `photo-${index}`,
-    title: photo.title || `${album.title} — Moment ${index + 1}`,
-    description: photo.description || album.description,
-    thumbnailSrc: getCloudinaryThumbnail(photo.src || photo.thumbnailSrc || photo.rawSrc),
-    fullSrc: getCloudinaryFullImage(photo.src || photo.fullSrc || photo.rawSrc),
-    rawSrc: photo.rawSrc || photo.src || "",
-    src: photo.src || photo.rawSrc || "",
-    width: photo.width || 1200,
-    height: photo.height || 800,
-    aspectRatio: photo.aspectRatio || "4/3",
-    isVideo: Boolean(photo.isVideo),
-  }));
-
-  return {
-    ...album,
-    coverThumbnail: getCloudinaryThumbnail(album.coverImage),
-    photos: optimizedPhotos,
-    photoCount: optimizedPhotos.length,
-  };
+  return formatAlbumDetail(album);
 }
 
 /**
