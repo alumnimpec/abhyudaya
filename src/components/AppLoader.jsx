@@ -13,8 +13,8 @@
  *      MIN_DISPLAY before exiting).
  *
  * What does NOT block the loader:
- *   - Individual page content (blogs, events, gallery images, team data).
- *     Those use skeleton loaders and NProgress inside their own components.
+ *   - Individual page content (blogs, events, gallery images, team data)
+ *     where localized skeletons remain useful.
  *   - Non-critical analytics, chat widgets, or third-party scripts.
  *
  * Offline / error handling:
@@ -25,11 +25,9 @@
  *   - Retry re-runs the Firebase auth check by calling window.location.reload()
  *     (simplest and most reliable recovery for a stuck auth check).
  *
- * This component intentionally does NOT show the constellation loader on
- * subsequent in-app navigations — it only shows on the very first page load
- * or hard refresh, because that is when the application shell itself is
- * booting. React Router navigations within the running app use the existing
- * NProgress bar + per-section skeleton loaders.
+ * This component shows the constellation loader during initial app startup.
+ * Lazy route chunks and blocking route data use the same loader in their own
+ * Suspense or page loading states after the app shell has mounted.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -46,7 +44,7 @@ export default function AppLoader({ children }) {
   const { loading: authLoading } = useAuth();
 
   // Only show the constellation on the very first mount of this session.
-  // After that, the app shell is warm and subsequent navigations use NProgress.
+  // After that, route transitions use the app's Suspense and page loaders.
   const [shouldShow] = useState(() => {
     try {
       return !sessionStorage.getItem(SESSION_KEY);
@@ -115,8 +113,8 @@ export default function AppLoader({ children }) {
       {/*
         Render children immediately so React can begin loading lazy chunks
         in the background while the animation plays. Suspense will catch
-        the lazy chunks via the existing <PageLoader /> fallback in App.jsx,
-        but only for chunks that finish loading after the constellation exits.
+        lazy chunks via the constellation fallback in App.jsx, including any
+        chunk that has not loaded when the initial animation exits.
       */}
       <div
         style={{

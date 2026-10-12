@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import ConstellationLoader from "../components/ConstellationLoader.jsx";
 import BreadcrumbSchema from "../components/seo/schemas/BreadcrumbSchema.jsx";
 import { getAlbumBySlug, getSynchronousAlbumBySlug } from "../services/galleryAlbumsService.js";
 import {
@@ -133,14 +134,7 @@ export default function EventAlbum() {
   };
 
   if (loading) {
-    return (
-      <div className="gallery-page">
-        <div className="album-detail-loading">
-          <div className="album-detail-spinner" />
-          <h2>Loading Event Album...</h2>
-        </div>
-      </div>
-    );
+    return <ConstellationLoader isReady={false} />;
   }
 
   if (error && error !== "Album not found.") {
