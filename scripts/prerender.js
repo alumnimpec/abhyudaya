@@ -42,6 +42,11 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function getBlogSocialImage(blog) {
+  const value = blog.featuredImage || blog.image;
+  return getPublicHttpsUrl(value) || `${BASE_URL}/abhyudaya-logo.png`;
+}
+
 function getPublicHttpsUrl(value) {
   if (typeof value !== "string" || !value.trim()) return null;
 
@@ -401,6 +406,56 @@ async function getRoutesToPrerender(db) {
     } else {
       console.log("[prerender] Firebase gallery is empty. Using static gallery data.");
       addGalleryAlbumRoutes(routes, await getBuildGalleryAlbums());
+    const galleryRoute = routes.find((route) => route.path === "/gallery");
+    if (galleryRoute) galleryRoute.galleryAlbums = publishedGalleryAlbums;
+
+    publishedGalleryAlbums.forEach((item) => {
+
+      if (item.slug) {
+        const slug = encodeURIComponent(
+          item.slug
+        );
+
+        routes.push({
+          path: `/gallery/${slug}`,
+          dataReady: true,
+          canonical: `/gallery/${slug}`,
+          title: `${item.title || "Event Album"} — Event Photos & Gallery | Abhyudaya Club`,
+          description: item.description || `Browse event photographs from ${item.title || "Abhyudaya Club"}.`,
+          image: getPublicHttpsUrl(item.coverImage),
+          imageAlt: item.title || "Abhyudaya Club event album",
+          galleryAlbum: item,
+          imageSelector:
+            ".gallery-clean-media",
+        });
+      }
+    });
+
+    /*
+     * If Firebase gallery is empty,
+     * fall back to static gallery data.
+     */
+
+    if (albums.empty) {
+      console.log(
+        "[prerender] Firebase gallery is empty. Using static gallery routes."
+      );
+
+      getStaticGallerySlugs().forEach(
+        (slug) => {
+          routes.push({
+            path: `/gallery/${encodeURIComponent(
+              slug
+            )}`,
+            dataReady: true,
+            canonical: `/gallery/${encodeURIComponent(
+              slug
+            )}`,
+            imageSelector:
+              ".gallery-clean-media",
+          });
+        }
+      );
     }
   } catch (error) {
     /*
