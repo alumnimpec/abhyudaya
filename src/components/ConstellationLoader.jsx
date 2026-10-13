@@ -247,7 +247,7 @@ const EDGE_DUR_MS   = 380; // single edge draw duration
    5. MAIN COMPONENT
    =================================================================== */
 
-export default function ConstellationLoader({ isReady, error, onRetry, onComplete }) {
+export default function ConstellationLoader({ isReady, error, onRetry }) {
   // Animation stage booleans
   const [stage, setStage] = useState(1);
   const [exiting, setExiting] = useState(false);
@@ -264,7 +264,6 @@ export default function ConstellationLoader({ isReady, error, onRetry, onComplet
   const timerRefs = useRef([]);
   const readyRef   = useRef(isReady);
   const startTime  = useRef(Date.now());
-  const onCompleteRef = useRef(onComplete);
 
   const addTimer = useCallback((fn, delay) => {
     const id = setTimeout(fn, delay);
@@ -276,10 +275,6 @@ export default function ConstellationLoader({ isReady, error, onRetry, onComplet
   useEffect(() => {
     return () => timerRefs.current.forEach(clearTimeout);
   }, []);
-
-  useEffect(() => {
-    onCompleteRef.current = onComplete;
-  }, [onComplete]);
 
   // Connectivity detection
   useEffect(() => {
@@ -374,10 +369,7 @@ export default function ConstellationLoader({ isReady, error, onRetry, onComplet
     addTimer(() => {
       setExiting(true);
       // Unmount after CSS fade-out completes
-      addTimer(() => {
-        setMounted(false);
-        onCompleteRef.current?.();
-      }, T.EXIT_DURATION + 50);
+      addTimer(() => setMounted(false), T.EXIT_DURATION + 50);
     }, remaining);
   }, [isReady, error, exiting, mounted, addTimer]);
 
