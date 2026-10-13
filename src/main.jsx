@@ -8,6 +8,7 @@ import App from "./App.jsx";
 
 import "./styles/tokens.css";
 import "./styles/shared.css";
+import "./styles/search-motion.css";
 
 import { AuthProvider } from "./context/AuthContext";
 import AppLoader from "./components/AppLoader.jsx";

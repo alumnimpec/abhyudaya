@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import BreadcrumbSchema from "../components/seo/schemas/BreadcrumbSchema.jsx";
@@ -36,9 +36,11 @@ const YEAR_FILTERS = ["all", "2026", "2025", "2024"];
 
 export default function Gallery() {
   const navigate = useNavigate();
+  const searchInputRef = useRef(null);
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
 
@@ -170,13 +172,24 @@ export default function Gallery() {
 
             {/* Search Bar & Surprise Me Trigger */}
             <div className="gallery-hero-actions">
-              <div className="gallery-hero-search-box">
+              <div
+                className={`gallery-hero-search-box${searchExpanded || searchQuery ? " is-expanded" : ""}`}
+                onClick={(event) => {
+                  if (event.target.closest(".gallery-search-clear")) return;
+                  searchInputRef.current?.focus();
+                }}
+              >
                 <FaSearch className="gallery-search-icon" aria-hidden="true" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder="Search albums, events, workshops..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchExpanded(true)}
+                  onBlur={() => {
+                    if (!searchQuery) setSearchExpanded(false);
+                  }}
                   className="gallery-hero-search-input"
                   aria-label="Search event albums"
                 />
@@ -184,7 +197,13 @@ export default function Gallery() {
                   <button
                     type="button"
                     className="gallery-search-clear"
-                    onClick={() => setSearchQuery("")}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setSearchQuery("");
+                      setSearchExpanded(false);
+                      searchInputRef.current?.blur();
+                    }}
                     aria-label="Clear search"
                   >
                     ✕

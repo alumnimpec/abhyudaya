@@ -1,0 +1,29 @@
+/* Shared, restrained focus treatment for labeled search fields. */
+:where(div, form, label):has(> input[aria-label*="search" i]) {
+  transition: box-shadow 220ms ease, border-color 220ms ease;
+}
+
+:where(div, form, label):has(> input[aria-label*="search" i]:focus) {
+  border-color: var(--sun, #eeb84a);
+  box-shadow: 0 0 0 3px rgba(238, 184, 74, 0.17);
+}
+
+:where(div, form, label):has(> input[aria-label*="search" i]:focus) > svg:first-child {
+  animation: search-icon-engage 380ms ease-out both;
+  color: var(--sun, #eeb84a);
+  transform-origin: center;
+}
+
+@keyframes search-icon-engage {
+  0% { scale: 1; }
+  55% { scale: 1.14; }
+  100% { scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(div, form, label):has(> input[aria-label*="search" i]),
+  :where(div, form, label):has(> input[aria-label*="search" i]:focus) > svg:first-child {
+    animation: none;
+    transition: none;
+  }
+}
