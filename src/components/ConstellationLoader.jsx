@@ -234,8 +234,8 @@ const T = {
   STAGE2_START:  380,   // Constellation begins forming
   STAGE3_START:  980,   // Logo reveal begins
   STAGE4_START: 1380,   // Identity text & bar appear
-  STAGE5_START: 1900,   // Living constellation (if still loading)
-  MIN_DISPLAY:  1600,   // Minimum time the loader stays visible
+  STAGE5_START: 1900,   // Living constellation
+  MIN_DISPLAY:  2200,   // Allows every formation phase to finish before fading
   EXIT_DURATION: 550,   // CSS fade-out duration
 };
 
@@ -247,7 +247,7 @@ const EDGE_DUR_MS   = 380; // single edge draw duration
    5. MAIN COMPONENT
    =================================================================== */
 
-export default function ConstellationLoader({ isReady, error, onRetry }) {
+export default function ConstellationLoader({ isReady, error, onRetry, onComplete }) {
   // Animation stage booleans
   const [stage, setStage] = useState(1);
   const [exiting, setExiting] = useState(false);
@@ -278,8 +278,10 @@ export default function ConstellationLoader({ isReady, error, onRetry }) {
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
+    document.documentElement.classList.add("cl-scroll-locked");
     document.body.style.overflow = "hidden";
     return () => {
+      document.documentElement.classList.remove("cl-scroll-locked");
       document.body.style.overflow = previousOverflow;
     };
   }, []);
@@ -377,16 +379,19 @@ export default function ConstellationLoader({ isReady, error, onRetry }) {
     if (exiting || !mounted) return;
 
     const elapsed = Date.now() - startTime.current;
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
     const minimumDisplay = reducedMotion ? 280 : T.MIN_DISPLAY;
     const remaining = Math.max(0, minimumDisplay - elapsed);
 
     addTimer(() => {
       setExiting(true);
       // Unmount after CSS fade-out completes
-      addTimer(() => setMounted(false), T.EXIT_DURATION + 50);
+      addTimer(() => {
+        setMounted(false);
+        onComplete?.();
+      }, T.EXIT_DURATION + 50);
     }, remaining);
-  }, [isReady, error, exiting, mounted, addTimer]);
+  }, [isReady, error, exiting, mounted, addTimer, onComplete]);
 
   if (!mounted) return null;
 

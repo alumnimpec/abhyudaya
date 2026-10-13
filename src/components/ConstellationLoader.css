@@ -6,6 +6,8 @@
    =================================================================== */
 
 /* Overlay */
+.cl-scroll-locked { overflow: hidden !important; }
+
 .cl-overlay {
   position: fixed;
   inset: 0;
@@ -418,6 +420,11 @@
   .cl-glow--pulse { animation: none; }
   .cl-edge--animate { animation: none; stroke-dashoffset: 0; opacity: 1; }
   .cl-edge--living { animation: none; opacity: 0.25; }
+  .cl-edge { stroke-dashoffset: 0; opacity: 0.25; }
+  .cl-glow,
+  .cl-logo,
+  .cl-identity,
+  .cl-bar-wrap { opacity: 1; transform: none; }
   .cl-bar { animation: cl-indeterminate-reduced 2s ease-in-out infinite; }
 }
 

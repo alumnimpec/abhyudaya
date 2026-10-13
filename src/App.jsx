@@ -10,7 +10,7 @@ import ReactGA from "react-ga4";
 
 import Layout from "./components/Layout.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
-import ConstellationLoader from "./components/ConstellationLoader.jsx";
+import PageLoader from "./components/PageLoader.jsx";
 import { ToastProvider } from "./Admin/components/Toast.jsx";
 import TimeCapsulePopup from "./components/TimeCapsulePopup.jsx";
 
@@ -181,7 +181,7 @@ export default function App() {
       {/* Time Capsule promotional popup — shown once per 7 days on public pages */}
       <TimeCapsulePopup />
 
-      <Suspense fallback={<ConstellationLoader isReady={false} />}>
+      <Suspense fallback={<PageLoader />}>
         <ErrorBoundary key={location.pathname}>
           <Routes>
             {/* ================= ADMIN ROUTES ================= */}
