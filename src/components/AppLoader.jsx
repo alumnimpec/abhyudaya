@@ -53,7 +53,7 @@ export default function AppLoader({ children }) {
     }
   });
 
-  const [appReady, setAppReady] = useState(!shouldShow || !authLoading);
+  const appReady = !shouldShow || !authLoading;
   const [error, setError] = useState(null);
 
   const timeoutRef = useRef(null);
@@ -73,8 +73,6 @@ export default function AppLoader({ children }) {
     if (!authLoading) {
       // Auth resolved — app shell is ready
       clearTimeout(timeoutRef.current);
-      setError(null);
-      setAppReady(true);
       markShown();
       return;
     }

@@ -263,7 +263,7 @@ export default function ConstellationLoader({ isReady, error, onRetry }) {
 
   const timerRefs = useRef([]);
   const readyRef   = useRef(isReady);
-  const startTime  = useRef(Date.now());
+  const startTime  = useRef(null);
 
   const addTimer = useCallback((fn, delay) => {
     const id = setTimeout(fn, delay);
@@ -273,7 +273,20 @@ export default function ConstellationLoader({ isReady, error, onRetry }) {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => timerRefs.current.forEach(clearTimeout);
+    startTime.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timers = timerRefs.current;
+    return () => timers.forEach(clearTimeout);
   }, []);
 
   // Connectivity detection
@@ -364,7 +377,9 @@ export default function ConstellationLoader({ isReady, error, onRetry }) {
     if (exiting || !mounted) return;
 
     const elapsed = Date.now() - startTime.current;
-    const remaining = Math.max(0, T.MIN_DISPLAY - elapsed);
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const minimumDisplay = reducedMotion ? 280 : T.MIN_DISPLAY;
+    const remaining = Math.max(0, minimumDisplay - elapsed);
 
     addTimer(() => {
       setExiting(true);

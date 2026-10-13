@@ -10,6 +10,7 @@ import "./styles/tokens.css";
 import "./styles/shared.css";
 
 import { AuthProvider } from "./context/AuthContext";
+import AppLoader from "./components/AppLoader.jsx";
 
 const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID;
 
@@ -38,7 +39,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <HelmetProvider>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <AppLoader>
+            <App />
+          </AppLoader>
         </AuthProvider>
       </BrowserRouter>
     </HelmetProvider>
