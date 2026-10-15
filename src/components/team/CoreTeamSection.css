@@ -117,6 +117,14 @@
   gap: 30px;
 }
 
+.core-team-section .team-year-empty {
+  margin: 0;
+  padding: 1.25rem 1rem;
+  color: #7a5b20;
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  text-align: center;
+}
+
 .core-team-card {
   background: #ffffff;
   border-radius: 22px;

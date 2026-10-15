@@ -27,7 +27,7 @@ export default function WebDevTeamSection({ members = [], onSelectMember }) {
             <span className="webdev-team-section__gold-divider" aria-hidden="true" />
           </div>
 
-          <h2 className="webdev-team-section__title">WEB DEVELOPMENT TEAM</h2>
+          <h2 className="webdev-team-section__title">Abhyudaya Developers</h2>
           
           <p className="webdev-team-section__subtitle">
             The engineers and developers crafting high-performance web platforms, interactive digital experiences, and scalable solutions for Abhyudaya Club.

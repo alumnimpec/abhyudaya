@@ -4,7 +4,8 @@ import { HiOutlineArrowUpRight } from 'react-icons/hi2';
 import MemberSocialLinks from './MemberSocialLinks';
 import './CoreTeamSection.css';
 
-export default function CoreTeamSection({ members = [], onSelectMember }) {
+export default function CoreTeamSection({ members = [], onSelectMember, selectedYear = '2026' }) {
+  const visibleMembers = members.filter((person) => String(person.year ?? person.batch ?? '2026') === selectedYear);
   if (!members || members.length === 0) return null;
 
   return (
@@ -32,8 +33,8 @@ export default function CoreTeamSection({ members = [], onSelectMember }) {
         </motion.div>
 
         {/* 3 Core Leads Grid */}
-        <div className="core-team-grid">
-          {members.map((person, idx) => {
+        {visibleMembers.length > 0 ? <div className="core-team-grid">
+          {visibleMembers.map((person, idx) => {
             const avatarFallback =
               'https://ui-avatars.com/api/?name=' +
               encodeURIComponent(person.name) +
@@ -108,7 +109,7 @@ export default function CoreTeamSection({ members = [], onSelectMember }) {
               </motion.div>
             );
           })}
-        </div>
+        </div> : <p className="team-year-empty">No data found for this year.</p>}
 
       </div>
     </section>

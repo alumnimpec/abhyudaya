@@ -45,6 +45,14 @@
   gap: 28px;
 }
 
+.leadership-section .team-year-empty {
+  margin: 0;
+  padding: 1.25rem 1rem;
+  color: rgba(251, 244, 232, 0.72);
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  text-align: center;
+}
+
 .leadership-card {
   background: var(--navy-card, #1c2549);
   border-radius: 24px;

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import MemberSocialLinks from './MemberSocialLinks';
 import './ExecutiveSection.css';
 
-export default function ExecutiveSection({ members = [], onSelectMember }) {
+export default function ExecutiveSection({ members = [], onSelectMember, selectedYear = '2026' }) {
   const [activeFilter, setActiveFilter] = useState('ALL');
 
   const filterTabs = [
@@ -14,11 +14,19 @@ export default function ExecutiveSection({ members = [], onSelectMember }) {
   ];
 
   // Filter members based on active tab
-  const filteredMembers = useMemo(() => {
+  const yearMembers = useMemo(() => {
     if (!members || members.length === 0) return [];
-    if (activeFilter === 'ALL') return members;
-
     return members.filter((member) => {
+      const memberYear = String(member.year ?? member.batch ?? member.session ?? member.academicYear ?? member.teamYear ?? '2026');
+      return memberYear === selectedYear;
+    });
+  }, [members, selectedYear]);
+
+  const filteredMembers = useMemo(() => {
+    if (yearMembers.length === 0) return [];
+    return yearMembers.filter((member) => {
+      if (activeFilter === 'ALL') return true;
+
       const dept = (member.department || '').trim();
       const upperDept = dept.toUpperCase();
 
@@ -49,7 +57,7 @@ export default function ExecutiveSection({ members = [], onSelectMember }) {
       }
       return true;
     });
-  }, [members, activeFilter]);
+  }, [yearMembers, activeFilter]);
 
   if (!members || members.length === 0) return null;
 
@@ -94,7 +102,7 @@ export default function ExecutiveSection({ members = [], onSelectMember }) {
         </div>
 
         {/* Executive Cards Grid */}
-        <motion.div layout className="executives-grid">
+        {filteredMembers.length > 0 ? <motion.div layout className="executives-grid">
           <AnimatePresence mode="popLayout">
             {filteredMembers.map((person, idx) => {
               const avatarFallback =
@@ -149,9 +157,14 @@ export default function ExecutiveSection({ members = [], onSelectMember }) {
               );
             })}
           </AnimatePresence>
-        </motion.div>
+        </motion.div> : null}
 
-        {filteredMembers.length === 0 && (
+        {yearMembers.length === 0 && (
+          <div className="executives-empty">
+            <p>No data found for this year.</p>
+          </div>
+        )}
+        {yearMembers.length > 0 && filteredMembers.length === 0 && (
           <div className="executives-empty">
             <p>No executives found in this department currently.</p>
           </div>

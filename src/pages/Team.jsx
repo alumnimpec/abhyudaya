@@ -25,6 +25,7 @@ export default function Team() {
   const [dbMembers, setDbMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [selectedYear, setSelectedYear] = useState('2026');
 
   const breadcrumbItems = [
     { name: 'Home', url: SITE_URL },
@@ -136,6 +137,15 @@ export default function Team() {
       {/* 1. HERO */}
       <TeamHero />
 
+      <div className="team-year-filter-wrap">
+        <label className="team-year-filter">
+          <span>Team Year</span>
+          <select value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)} aria-label="Select team year">
+            {['2025', '2026', '2027', '2028'].map((year) => <option key={year} value={year}>{year}</option>)}
+          </select>
+        </label>
+      </div>
+
       {loading ? (
         <section className="section team-loading">
           <div className="wrap">
@@ -159,6 +169,7 @@ export default function Team() {
                 title="Student Leadership"
                 eyebrow="Executive Officers"
                 members={mainLeadership}
+                selectedYear={selectedYear}
                 onSelectMember={setSelectedMember}
               />
             </div>
@@ -171,6 +182,7 @@ export default function Team() {
                 title="Domain &amp; Vertical Leads"
                 eyebrow="Functional Directors"
                 members={verticalLeads}
+                selectedYear={selectedYear}
                 onSelectMember={setSelectedMember}
               />
             </div>
@@ -180,6 +192,7 @@ export default function Team() {
           {core.length > 0 && (
             <CoreTeamSection
               members={core}
+              selectedYear={selectedYear}
               onSelectMember={setSelectedMember}
             />
           )}
@@ -196,6 +209,7 @@ export default function Team() {
               title="Executive Committee"
               eyebrow="Executives"
               members={executives}
+              selectedYear={selectedYear}
               onSelectMember={setSelectedMember}
             />
           )}
@@ -207,6 +221,7 @@ export default function Team() {
                 title="Associate Executives"
                 eyebrow="Support Team"
                 members={associates}
+                selectedYear={selectedYear}
                 onSelectMember={setSelectedMember}
               />
             </div>

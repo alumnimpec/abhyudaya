@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import MemberSocialLinks from './MemberSocialLinks';
 import './LeadershipSection.css';
 
-export default function LeadershipSection({ members = [], onSelectMember }) {
+export default function LeadershipSection({ members = [], onSelectMember, selectedYear = '2026' }) {
+  const visibleMembers = members.filter((person) => String(person.year ?? person.batch ?? '2026') === selectedYear);
   // We expect President, Vice President, General Secretary
   // If static or db has them, display them
   if (!members || members.length === 0) return null;
@@ -22,8 +23,9 @@ export default function LeadershipSection({ members = [], onSelectMember }) {
         </div>
 
         {/* 3 Prominent Cards Grid */}
-        <div className="leadership-grid">
-          {members.map((person, idx) => {
+        {visibleMembers.length > 0 ? (
+          <div className="leadership-grid">
+          {visibleMembers.map((person, idx) => {
             const avatarFallback =
               'https://ui-avatars.com/api/?name=' +
               encodeURIComponent(person.name) +
@@ -105,7 +107,10 @@ export default function LeadershipSection({ members = [], onSelectMember }) {
               </motion.div>
             );
           })}
-        </div>
+          </div>
+        ) : (
+          <p className="team-year-empty">No data found for this year.</p>
+        )}
 
       </div>
     </section>

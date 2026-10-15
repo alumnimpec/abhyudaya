@@ -281,6 +281,8 @@ export function normalizeMember(member, index = 0) {
         : index + 1,
     active,
     category: member.category || CATEGORY_BY_LEVEL[level] || "Executive Board",
+    year: member.year ?? member.batch ?? member.session ?? member.academicYear ?? member.teamYear ?? "2026",
+    batch: member.batch ?? member.year ?? member.session ?? member.academicYear ?? member.teamYear ?? "2026",
   };
 }
 
