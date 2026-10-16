@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { HiOutlineArrowUpRight } from 'react-icons/hi2';
 import MemberSocialLinks from './MemberSocialLinks';
@@ -109,7 +108,7 @@ export default function CoreTeamSection({ members = [], onSelectMember, selected
               </motion.div>
             );
           })}
-        </div> : <p className="team-year-empty">No data found for this year.</p>}
+        </div> : <p className="team-year-empty">No data found for that year.</p>}
 
       </div>
     </section>

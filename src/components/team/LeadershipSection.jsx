@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import MemberSocialLinks from './MemberSocialLinks';
 import './LeadershipSection.css';
@@ -71,7 +70,7 @@ export default function LeadershipSection({ members = [], onSelectMember, select
                   <h3 className="leadership-card__name">{person.name}</h3>
 
                   <p className="leadership-card__dept">
-                    Executive Governance • 2026
+                    Executive Governance • {person.year || selectedYear || '2026'}
                   </p>
 
                   <p className="leadership-card__bio">
@@ -109,7 +108,7 @@ export default function LeadershipSection({ members = [], onSelectMember, select
           })}
           </div>
         ) : (
-          <p className="team-year-empty">No data found for this year.</p>
+          <p className="team-year-empty">No data found for that year.</p>
         )}
 
       </div>

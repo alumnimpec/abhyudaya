@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MemberSocialLinks from './MemberSocialLinks';
 import './ExecutiveSection.css';
@@ -161,7 +161,7 @@ export default function ExecutiveSection({ members = [], onSelectMember, selecte
 
         {yearMembers.length === 0 && (
           <div className="executives-empty">
-            <p>No data found for this year.</p>
+            <p>No data found for that year.</p>
           </div>
         )}
         {yearMembers.length > 0 && filteredMembers.length === 0 && (

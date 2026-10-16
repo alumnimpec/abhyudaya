@@ -1,8 +1,7 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import './TeamHero.css';
 
-export default function TeamHero() {
+export default function TeamHero({ selectedYear = '2026' }) {
   return (
     <section className="team-hero">
       <div className="wrap">
@@ -16,7 +15,7 @@ export default function TeamHero() {
             transition={{ duration: 0.5 }}
           >
             <span className="team-hero__badge-dot" />
-            <span className="team-hero__badge-text">TEAM / 2026</span>
+            <span className="team-hero__badge-text">TEAM / {selectedYear}</span>
           </motion.div>
 
           {/* Editorial Headline */}

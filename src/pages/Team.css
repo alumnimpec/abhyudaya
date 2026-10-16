@@ -179,3 +179,85 @@
     padding: 0.45rem 0.55rem 0.45rem 0.75rem;
   }
 }
+
+/* ================================================================
+   PUBLIC TEAM EMPTY STATE (WHEN NO ROSTER FOR SELECTED YEAR)
+   ================================================================ */
+.team-empty-section {
+  padding: 4.5rem 1.5rem 6.5rem;
+  background: #fbf4e8;
+  display: flex;
+  justify-content: center;
+}
+
+.team-year-empty-card {
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 3.25rem 2.25rem;
+  border: 1px solid rgba(17, 26, 50, 0.1);
+  border-radius: 1.25rem;
+  background: #fffdf8;
+  box-shadow: 0 12px 36px rgba(17, 26, 50, 0.05);
+  text-align: center;
+}
+
+.team-year-empty-icon {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(238, 184, 74, 0.14);
+  border: 1px solid rgba(238, 184, 74, 0.35);
+}
+
+.team-year-empty-heading {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #111a32;
+  margin-bottom: 0.4rem;
+  letter-spacing: -0.02em;
+}
+
+.team-year-empty {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #b45309;
+  margin-bottom: 0.75rem;
+}
+
+.team-year-empty-sub {
+  font-size: 0.95rem;
+  color: #64748b;
+  max-width: 450px;
+  margin: 0 auto 1.75rem;
+  line-height: 1.6;
+}
+
+.team-empty-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.6rem;
+  border-radius: 0.65rem;
+  background: #111a32;
+  color: #eeb84a;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border: 1px solid rgba(238, 184, 74, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(17, 26, 50, 0.12);
+}
+
+.team-empty-switch-btn:hover {
+  background: #192648;
+  color: #facc15;
+  border-color: #facc15;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(17, 26, 50, 0.2);
+}
+

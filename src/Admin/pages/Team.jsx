@@ -17,6 +17,9 @@ import {
   updateTeamMember,
   deleteTeamMember,
   setTeamMemberActive,
+  getTeamYears,
+  addTeamYear,
+  DEFAULT_TEAM_YEARS,
 } from "./services/teamService";
 import {
   FaLinkedin,
@@ -44,6 +47,9 @@ import {
   FaFilter,
   FaRedo,
   FaLaptopCode,
+  FaCalendarAlt,
+  FaCalendarPlus,
+  FaCheck,
 } from "react-icons/fa";
 import "./style/admin.css";
 import "./Team.css";
@@ -61,6 +67,7 @@ const INITIAL_FORM_STATE = {
   order: 1,
   image: "",
   active: true,
+  year: "2026",
 };
 
 export default function Team() {
@@ -71,6 +78,13 @@ export default function Team() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
+
+  // Year State & Modal
+  const [availableYears, setAvailableYears] = useState(DEFAULT_TEAM_YEARS);
+  const [selectedYear, setSelectedYear] = useState("2026");
+  const [showAddYearModal, setShowAddYearModal] = useState(false);
+  const [newYearInput, setNewYearInput] = useState("");
+  const [isAddingYear, setIsAddingYear] = useState(false);
 
   // Search, Filter & View Mode
   const [searchTerm, setSearchTerm] = useState("");
@@ -96,48 +110,91 @@ export default function Team() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
-  // Load team data from Firestore
-  const loadMembers = useCallback(async () => {
+  // Load team data & years from Firestore
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getTeamMembers();
-      setMembers(data || []);
+      const [membersData, yearsData] = await Promise.all([
+        getTeamMembers(),
+        getTeamYears(),
+      ]);
+      setMembers(membersData || []);
+      if (Array.isArray(yearsData) && yearsData.length > 0) {
+        setAvailableYears(yearsData);
+      }
     } catch (err) {
-      console.error("Failed to load team members:", err);
-      toast.error("Failed to load team members from database.");
+      console.error("Failed to load team data:", err);
+      toast.error("Failed to load team data from database.");
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
+    let active = true;
+    const fetchInitialData = async () => {
+      try {
+        const [membersData, yearsData] = await Promise.all([
+          getTeamMembers(),
+          getTeamYears(),
+        ]);
+        if (active) {
+          setMembers(membersData || []);
+          if (Array.isArray(yearsData) && yearsData.length > 0) {
+            setAvailableYears(yearsData);
+          }
+        }
+      } catch (err) {
+        if (active) {
+          console.error("Failed to load team data:", err);
+          toast.error("Failed to load team data from database.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+    fetchInitialData();
+    return () => {
+      active = false;
+    };
+  }, [toast]);
 
-  // Dynamic Statistics
+  // Year-filtered members
+  const yearMembers = useMemo(() => {
+    return members.filter((m) => {
+      const memberYear = String(
+        m.year ?? m.batch ?? m.session ?? m.academicYear ?? m.teamYear ?? "2026"
+      ).trim();
+      return memberYear === selectedYear;
+    });
+  }, [members, selectedYear]);
+
+  // Dynamic Statistics scoped to the currently selected year
   const stats = useMemo(() => {
-    const total = members.length;
-    const activeCount = members.filter((m) => m.active !== false).length;
-    const leadershipCount = members.filter((m) => m.level === LEVELS.LEADERSHIP).length;
-    const coreCount = members.filter((m) => m.level === LEVELS.CORE).length;
-    const execCount = members.filter((m) => m.level === LEVELS.EXECUTIVE).length;
-    const webDevCount = members.filter(
+    const total = yearMembers.length;
+    const activeCount = yearMembers.filter((m) => m.active !== false).length;
+    const leadershipCount = yearMembers.filter((m) => m.level === LEVELS.LEADERSHIP).length;
+    const coreCount = yearMembers.filter((m) => m.level === LEVELS.CORE).length;
+    const execCount = yearMembers.filter((m) => m.level === LEVELS.EXECUTIVE).length;
+    const webDevCount = yearMembers.filter(
       (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
     ).length;
-    const facultyCount = members.filter((m) => m.level === LEVELS.FACULTY_ADVISOR).length;
+    const facultyCount = yearMembers.filter((m) => m.level === LEVELS.FACULTY_ADVISOR).length;
     return { total, activeCount, leadershipCount, coreCount, execCount, webDevCount, facultyCount };
-  }, [members]);
+  }, [yearMembers]);
 
-  // Tab count helper
+  // Tab count helper scoped to year
   const getTabCount = useCallback(
     (tabId) => {
       switch (tabId) {
         case "ALL":
-          return members.length;
+          return yearMembers.length;
         case "ACTIVE":
           return stats.activeCount;
         case "INACTIVE":
-          return members.length - stats.activeCount;
+          return yearMembers.length - stats.activeCount;
         case "LEADERSHIP":
           return stats.leadershipCount;
         case "CORE":
@@ -152,14 +209,14 @@ export default function Team() {
           return 0;
       }
     },
-    [members.length, stats]
+    [yearMembers.length, stats]
   );
 
   // Filter & Search Logic
   const filteredMembers = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
-    return members.filter((m) => {
+    return yearMembers.filter((m) => {
       // Search matching (name, role, department, email, bio)
       if (query) {
         const nameMatch = (m.name || "").toLowerCase().includes(query);
@@ -191,7 +248,7 @@ export default function Team() {
 
       return true;
     });
-  }, [members, searchTerm, selectedDept, activeTab]);
+  }, [yearMembers, searchTerm, selectedDept, activeTab]);
 
   const hasActiveFilters = searchTerm !== "" || activeTab !== "ALL" || selectedDept !== "ALL";
 
@@ -204,13 +261,14 @@ export default function Team() {
   // Form Management
   const resetForm = () => {
     const nextOrder =
-      members.length > 0
-        ? Math.max(...members.map((m) => Number(m.order) || 0)) + 1
+      yearMembers.length > 0
+        ? Math.max(...yearMembers.map((m) => Number(m.order) || 0)) + 1
         : 1;
 
     setSelectedPreset("President");
     setFormData({
       ...INITIAL_FORM_STATE,
+      year: selectedYear,
       order: nextOrder,
     });
     setSelectedFile(null);
@@ -226,12 +284,17 @@ export default function Team() {
       const matchingPreset = ROLE_PRESETS.find((p) => p.value === member.role);
       setSelectedPreset(matchingPreset ? matchingPreset.value : "custom");
 
+      const memberYear = String(
+        member.year ?? member.batch ?? member.session ?? member.academicYear ?? selectedYear
+      ).trim();
+
       setFormData({
         name: member.name || "",
         role: member.role || "",
         level: member.level || LEVELS.EXECUTIVE,
         department: member.department || "Operations",
         category: member.category || "Domain Leads",
+        year: memberYear,
         linkedin: member.linkedin || "",
         github: member.github || "",
         email: member.email || "",
@@ -247,6 +310,53 @@ export default function Team() {
     }
     setIsFormDirty(false);
     setShowDrawer(true);
+  };
+
+  // Add New Year Dialog Handlers
+  const handleOpenAddYearModal = () => {
+    const numericYears = availableYears
+      .map((y) => parseInt(y, 10))
+      .filter((n) => !isNaN(n));
+    const nextSuggested = numericYears.length > 0 ? String(Math.max(...numericYears) + 1) : "2027";
+    setNewYearInput(nextSuggested);
+    setShowAddYearModal(true);
+  };
+
+  const handleConfirmAddYear = async (e) => {
+    if (e) e.preventDefault();
+    const clean = newYearInput.trim();
+    if (!clean) {
+      toast.error("Please enter a valid academic/executive year.");
+      return;
+    }
+    if (availableYears.includes(clean)) {
+      toast.info(`Year "${clean}" is already in your year list.`);
+      setSelectedYear(clean);
+      setShowAddYearModal(false);
+      return;
+    }
+
+    setIsAddingYear(true);
+    try {
+      await addTeamYear(clean);
+      setAvailableYears((prev) => {
+        const nextYears = Array.from(new Set([...prev, clean]));
+        return nextYears.sort((a, b) => {
+          const numA = parseInt(a, 10);
+          const numB = parseInt(b, 10);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          return a.localeCompare(b);
+        });
+      });
+      setSelectedYear(clean);
+      setShowAddYearModal(false);
+      toast.success(`Year ${clean} initialized successfully! You can now add members for ${clean}.`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to initialize new year.");
+    } finally {
+      setIsAddingYear(false);
+    }
   };
 
   const handleCloseDrawer = () => {
@@ -379,17 +489,21 @@ export default function Team() {
     }
 
     setSaving(true);
+    const targetYear = String(formData.year || selectedYear).trim();
     try {
       if (editingMember) {
-        await updateTeamMember(editingMember.id, formData, selectedFile);
-        toast.success(`Updated "${formData.name}" successfully!`);
+        await updateTeamMember(editingMember.id, { ...formData, year: targetYear }, selectedFile);
+        toast.success(`Updated "${formData.name}" for year ${targetYear} successfully!`);
       } else {
-        await addTeamMember(formData, selectedFile);
-        toast.success(`Added "${formData.name}" to team successfully!`);
+        await addTeamMember({ ...formData, year: targetYear }, selectedFile);
+        toast.success(`Added "${formData.name}" to team ${targetYear} successfully!`);
       }
       setShowDrawer(false);
       resetForm();
-      await loadMembers();
+      if (targetYear !== selectedYear) {
+        setSelectedYear(targetYear);
+      }
+      await loadData();
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to save team member.");
@@ -410,7 +524,7 @@ export default function Team() {
           ? `Activated "${member.name}" — now visible on public site.`
           : `Deactivated "${member.name}" — hidden from public site.`
       );
-      await loadMembers();
+      await loadData();
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to update member status.");
@@ -432,7 +546,7 @@ export default function Team() {
       await deleteTeamMember(deleteModalMember.id);
       toast.success(`Permanently deleted "${deleteModalMember.name}".`);
       setDeleteModalMember(null);
-      await loadMembers();
+      await loadData();
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to delete team member.");
@@ -448,7 +562,7 @@ export default function Team() {
       await setTeamMemberActive(deleteModalMember.id, false);
       toast.success(`Deactivated "${deleteModalMember.name}" — hidden from public site.`);
       setDeleteModalMember(null);
-      await loadMembers();
+      await loadData();
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to deactivate member.");
@@ -484,32 +598,70 @@ export default function Team() {
 
         <div className="dashboard-content">
           <div className="admin-team-page">
-            {/* 1. Header with Breadcrumb & Primary CTA */}
+            {/* 1. Header with Breadcrumb, Year Selector & Primary CTA */}
             <div className="team-header-container">
               <div>
                 <div className="team-breadcrumb">
                   <Link to="/admin/dashboard">Dashboard</Link>
                   <span className="team-breadcrumb-sep">/</span>
                   <span>Team Management</span>
+                  <span className="team-breadcrumb-sep">/</span>
+                  <span className="team-year-badge-breadcrumb">{selectedYear}</span>
                 </div>
                 <div className="team-title-row">
                   <h1>Team Management</h1>
                   <span className="team-count-badge">
-                    <FaUsers /> {members.length} {members.length === 1 ? "Member" : "Members"}
+                    <FaUsers /> {yearMembers.length} {yearMembers.length === 1 ? "Member" : "Members"} ({selectedYear})
                   </span>
                 </div>
                 <p className="team-header-desc">
-                  Manage faculty coordinators, student leadership, domain leads, executives, and website visibility.
+                  Manage faculty coordinators, student leadership, domain leads, executives, and website visibility for academic year {selectedYear}.
                 </p>
               </div>
 
               <div className="team-header-actions">
+                {/* Dynamic Year Selector & Add Year Toolbar */}
+                <div className="team-year-picker-container">
+                  <label htmlFor="team-year-selector-admin" className="team-year-picker-label">
+                    <FaCalendarAlt /> Year:
+                  </label>
+                  <select
+                    id="team-year-selector-admin"
+                    className="team-year-picker-select"
+                    value={selectedYear}
+                    onChange={(e) => {
+                      if (e.target.value === "__add_new__") {
+                        handleOpenAddYearModal();
+                      } else {
+                        setSelectedYear(e.target.value);
+                      }
+                    }}
+                    title="Choose academic or executive year to manage"
+                  >
+                    {availableYears.map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr} {yr === "2026" ? "(Current)" : ""}
+                      </option>
+                    ))}
+                    <option value="__add_new__">+ Add New Year...</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    className="team-btn-add-year"
+                    onClick={handleOpenAddYearModal}
+                    title="Initialize a new academic or executive year"
+                  >
+                    <FaCalendarPlus /> Add Year
+                  </button>
+                </div>
+
                 <a
-                  href="/team"
+                  href={`/team?year=${selectedYear}`}
                   target="_blank"
                   rel="noreferrer"
                   className="team-btn-secondary"
-                  title="Preview public team page"
+                  title="Preview public team page for this year"
                 >
                   <FaExternalLinkAlt /> View Public Page
                 </a>
@@ -518,7 +670,7 @@ export default function Team() {
                   className="team-btn-primary"
                   onClick={() => handleOpenDrawer()}
                 >
-                  <FaPlus /> Add Member
+                  <FaPlus /> Add Member ({selectedYear})
                 </button>
               </div>
             </div>
@@ -687,7 +839,7 @@ export default function Team() {
 
                 <button
                   type="button"
-                  onClick={loadMembers}
+                  onClick={loadData}
                   className="team-btn-secondary"
                   style={{ padding: "7px 12px", fontSize: "12px" }}
                   title="Refresh team members from database"
@@ -789,12 +941,14 @@ export default function Team() {
                   <FaUsers />
                 </div>
                 <h3 className="team-empty-title">
-                  {hasActiveFilters ? "No matching team members" : "No team members found"}
+                  {hasActiveFilters
+                    ? `No matching team members in ${selectedYear}`
+                    : `No team members found for ${selectedYear}`}
                 </h3>
                 <p className="team-empty-desc">
                   {hasActiveFilters
                     ? "Try adjusting your search terms, changing the department, or resetting filters."
-                    : "Get started by adding faculty advisors, student leadership, domain leads, and executive team members."}
+                    : `No profiles have been added for the ${selectedYear} team roster yet. You can initialize this year's roster now.`}
                 </p>
                 {hasActiveFilters ? (
                   <button
@@ -810,7 +964,7 @@ export default function Team() {
                     className="team-btn-primary"
                     onClick={() => handleOpenDrawer()}
                   >
-                    <FaPlus /> Add First Member
+                    <FaPlus /> Add First Member for {selectedYear}
                   </button>
                 )}
               </div>
@@ -1350,6 +1504,27 @@ export default function Team() {
 
                     <div className="team-form-row">
                       <div className="team-form-group">
+                        <label className="team-form-label">
+                          Academic / Team Year <span className="team-form-required">*</span>
+                        </label>
+                        <select
+                          name="year"
+                          className="team-form-select"
+                          value={formData.year}
+                          onChange={handleInputChange}
+                        >
+                          {availableYears.map((yr) => (
+                            <option key={yr} value={yr}>
+                              {yr} {yr === "2026" ? "(Current)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="team-form-hint">
+                          Profile will be published under the {formData.year} roster.
+                        </span>
+                      </div>
+
+                      <div className="team-form-group">
                         <label className="team-form-label">Display Order Priority</label>
                         <input
                           type="number"
@@ -1364,7 +1539,9 @@ export default function Team() {
                           Lower numbers appear first within the same tier.
                         </span>
                       </div>
+                    </div>
 
+                    <div className="team-form-row">
                       <div className="team-form-group">
                         <label className="team-form-label">Public Status</label>
                         <select
@@ -1560,6 +1737,89 @@ export default function Team() {
                     Discard Changes
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* 8. INITIALIZE NEW YEAR MODAL */}
+          {showAddYearModal && (
+            <div
+              className="team-modal-backdrop"
+              onClick={() => !isAddingYear && setShowAddYearModal(false)}
+            >
+              <div
+                className="team-modal-box team-add-year-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+                  <div className="team-modal-icon-wrap modal-icon-primary">
+                    <FaCalendarPlus />
+                  </div>
+                  <div>
+                    <h3 className="team-modal-title">Initialize New Team Year</h3>
+                    <p className="team-modal-desc">
+                      Create a new academic or executive roster year (e.g. 2027, 2028, 2029) to manage its leadership and domain team profiles.
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleConfirmAddYear}>
+                  <div className="team-form-group" style={{ marginTop: "16px" }}>
+                    <label className="team-form-label">
+                      Academic / Executive Year <span className="team-form-required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="team-form-input"
+                      placeholder="e.g. 2027 or 2027-28"
+                      value={newYearInput}
+                      onChange={(e) => setNewYearInput(e.target.value)}
+                      autoFocus
+                      required
+                    />
+                    <div className="team-quick-year-pills">
+                      <span className="team-form-hint">Quick suggestions:</span>
+                      {["2027", "2028", "2029", "2030"]
+                        .filter((y) => !availableYears.includes(y))
+                        .slice(0, 3)
+                        .map((suggestedYear) => (
+                          <button
+                            key={suggestedYear}
+                            type="button"
+                            className="team-year-suggestion-pill"
+                            onClick={() => setNewYearInput(suggestedYear)}
+                          >
+                            +{suggestedYear}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+
+                  <div className="team-modal-actions" style={{ marginTop: "20px" }}>
+                    <button
+                      type="button"
+                      className="team-modal-btn-cancel"
+                      onClick={() => setShowAddYearModal(false)}
+                      disabled={isAddingYear}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="team-btn-primary"
+                      disabled={isAddingYear || !newYearInput.trim()}
+                      style={{ padding: "8px 18px", fontSize: "13px" }}
+                    >
+                      {isAddingYear ? (
+                        "Initializing..."
+                      ) : (
+                        <>
+                          <FaCheck /> Initialize Year
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}

@@ -50,6 +50,8 @@ export const DEPARTMENTS = {
   WEB_DEV: "WEB_DEV",
 };
 
+export const DEFAULT_TEAM_YEARS = ["2025", "2026", "2027", "2028"];
+
 // Fixed role presets an admin can pick for Faculty / Leadership / Core / Web Dev.
 // Selecting one of these auto-locks level + department.
 export const ROLE_PRESETS = [
