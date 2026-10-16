@@ -318,8 +318,8 @@ export default function Team() {
             </div>
           )}
 
-          {/* 9. WEB DEVELOPMENT TEAM (Final Team Category) */}
-          {webDev.length > 0 && (
+          {/* 9. ABHYUDAYA DEVELOPERS — Only visible under AY 2026 */}
+          {webDev.length > 0 && selectedYear === '2026' && (
             <WebDevTeamSection
               members={webDev}
               onSelectMember={setSelectedMember}

@@ -12,10 +12,11 @@ import {
   orderBy,
   arrayUnion,
   arrayRemove,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { uploadImage } from "../Admin/pages/services/imageUpload";
-import { CATEGORY_BY_LEVEL, LEVELS, VALID_LEVELS, isValidUrl } from "../components/team/teamUtils";
+import { CATEGORY_BY_LEVEL, LEVELS, VALID_LEVELS, isValidUrl, ABHYUDAYA_DEV_FIXED_YEAR } from "../components/team/teamUtils";
 
 const teamRef = collection(db, "team");
 const teamMetaYearsDoc = doc(db, "team_meta", "years");
@@ -178,11 +179,28 @@ function validateTeamMemberData(data) {
       throw new Error("Department is required for Core, Executive, and Web Development members.");
     }
   }
+  // Abhyudaya Developers are permanently locked to AY 2026.
+  // Reject any attempt to save a WEB_DEV member under a different year.
+  if (data.level === LEVELS.WEB_DEV) {
+    const requestedYear = String(data.year || "").trim();
+    if (requestedYear && requestedYear !== ABHYUDAYA_DEV_FIXED_YEAR) {
+      throw new Error(
+        `Abhyudaya Developers profiles are permanently associated with Academic Year ${ABHYUDAYA_DEV_FIXED_YEAR}. ` +
+        `You cannot move them to ${requestedYear}.`
+      );
+    }
+  }
   if (!isValidUrl(data.linkedin)) {
     throw new Error("LinkedIn URL is not valid. Please provide a full https:// URL or leave it empty.");
   }
   if (!isValidUrl(data.github)) {
     throw new Error("GitHub URL is not valid. Please provide a full https:// URL or leave it empty.");
+  }
+  if (!isValidUrl(data.instagram)) {
+    throw new Error("Instagram URL is not valid. Please provide a full https:// URL or leave it empty.");
+  }
+  if (!isValidUrl(data.website)) {
+    throw new Error("Portfolio/Website URL is not valid. Please provide a full https:// URL or leave it empty.");
   }
   if (data.order !== undefined && data.order !== null && data.order !== "" && Number.isNaN(Number(data.order))) {
     throw new Error("Display order must be a valid number.");
@@ -197,21 +215,30 @@ function validateTeamMemberData(data) {
  */
 function buildTeamMemberPayload(data, image) {
   const level = data.level || LEVELS.EXECUTIVE;
-  const year = String(data.year || "2026").trim();
+  // Abhyudaya Developers are always locked to AY 2026 — override any submitted year value.
+  const year = level === LEVELS.WEB_DEV
+    ? ABHYUDAYA_DEV_FIXED_YEAR
+    : String(data.year || ABHYUDAYA_DEV_FIXED_YEAR).trim();
 
   return {
     name: String(data.name).trim(),
     role: String(data.role).trim(),
     level,
     department: data.department ? String(data.department).trim() : "",
-    category: data.category || CATEGORY_BY_LEVEL[level] || "Executive Board",
+    category: level === LEVELS.WEB_DEV
+      ? "Abhyudaya Developers"
+      : (data.category || CATEGORY_BY_LEVEL[level] || "Executive Board"),
     year,
     batch: year,
     image,
     linkedin: (data.linkedin || "").trim(),
     github: (data.github || "").trim(),
+    instagram: (data.instagram || "").trim(),
+    website: (data.website || "").trim(),
     email: (data.email || "").trim(),
     bio: (data.bio || "").trim(),
+    quote: (data.quote || "").trim(),
+    featured: Boolean(data.featured),
     order: data.order !== undefined && data.order !== null && data.order !== "" ? Number(data.order) : 99,
     active: data.active === false ? false : true,
   };
@@ -273,6 +300,74 @@ export async function setTeamMemberActive(id, active) {
 
 export async function deleteTeamMember(id) {
   await deleteDoc(doc(db, "team", id));
+}
+
+/**
+ * Batch updates active status for multiple team members at once.
+ */
+export async function batchUpdateTeamMembersActive(ids, active) {
+  if (!Array.isArray(ids) || ids.length === 0) return;
+  const batch = writeBatch(db);
+  ids.forEach((id) => {
+    const memberRef = doc(db, "team", id);
+    batch.update(memberRef, {
+      active: Boolean(active),
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await batch.commit();
+}
+
+/**
+ * Batch moves multiple team members to a target academic year.
+ * STRICT ENFORCEMENT: Abhyudaya Developers can NEVER be moved from AY 2026.
+ */
+export async function batchMoveTeamMembersYear(membersList, targetYear) {
+  if (!Array.isArray(membersList) || membersList.length === 0) return;
+  const cleanTargetYear = String(targetYear || "").trim();
+  if (!cleanTargetYear) {
+    throw new Error("Please select a target academic year.");
+  }
+
+  // Check for any Abhyudaya Developers in the batch
+  const devMembers = membersList.filter(
+    (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
+  );
+
+  if (devMembers.length > 0 && cleanTargetYear !== ABHYUDAYA_DEV_FIXED_YEAR) {
+    const devNames = devMembers.map((m) => m.name).join(", ");
+    throw new Error(
+      `Abhyudaya Developers profiles (${devNames}) are permanently locked to Academic Year ${ABHYUDAYA_DEV_FIXED_YEAR} and cannot be moved to ${cleanTargetYear}.`
+    );
+  }
+
+  const batch = writeBatch(db);
+  membersList.forEach((m) => {
+    // Skip if somehow WEB_DEV and same year
+    if (m.level === LEVELS.WEB_DEV && cleanTargetYear === ABHYUDAYA_DEV_FIXED_YEAR) {
+      return;
+    }
+    const memberRef = doc(db, "team", m.id);
+    batch.update(memberRef, {
+      year: cleanTargetYear,
+      batch: cleanTargetYear,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await batch.commit();
+}
+
+/**
+ * Batch deletes multiple team members at once.
+ */
+export async function batchDeleteTeamMembers(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return;
+  const batch = writeBatch(db);
+  ids.forEach((id) => {
+    const memberRef = doc(db, "team", id);
+    batch.delete(memberRef);
+  });
+  await batch.commit();
 }
 
 

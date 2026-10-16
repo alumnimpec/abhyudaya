@@ -26,8 +26,16 @@ export const LEVEL_LABELS = {
   [LEVELS.LEADERSHIP]: "The Leadership",
   [LEVELS.CORE]: "Core Team",
   [LEVELS.EXECUTIVE]: "Executive",
-  [LEVELS.WEB_DEV]: "Web Development Team",
+  [LEVELS.WEB_DEV]: "Abhyudaya Developers",
 };
+
+/**
+ * ABHYUDAYA DEVELOPERS — Protected Section Constants
+ * The Abhyudaya Developers section is permanently locked to AY 2026.
+ * These constants must be used by the service layer to enforce restrictions.
+ */
+export const ABHYUDAYA_DEV_FIXED_YEAR = "2026";
+export const ABHYUDAYA_DEV_SECTION_ID = "abhyudaya-developers";
 
 // Canonical department labels used consistently by Admin + Public.
 export const DEPARTMENT_OPTIONS = [
@@ -105,25 +113,25 @@ export const ROLE_PRESETS = [
     category: "Core Team",
   },
   {
-    label: "Web Developer (Web Dev)",
+    label: "Web Developer (Abhyudaya Developers)",
     value: "Web Developer",
     level: LEVELS.WEB_DEV,
     department: "Web Development",
-    category: "Web Development Team",
+    category: "Abhyudaya Developers",
   },
   {
-    label: "Frontend Developer (Web Dev)",
+    label: "Frontend Developer (Abhyudaya Developers)",
     value: "Frontend Developer",
     level: LEVELS.WEB_DEV,
     department: "Web Development",
-    category: "Web Development Team",
+    category: "Abhyudaya Developers",
   },
   {
-    label: "Full Stack Developer (Web Dev)",
+    label: "Full Stack Developer (Abhyudaya Developers)",
     value: "Full Stack Developer",
     level: LEVELS.WEB_DEV,
     department: "Web Development",
-    category: "Web Development Team",
+    category: "Abhyudaya Developers",
   },
   {
     label: "Operations Executive (Executive)",
@@ -155,7 +163,7 @@ export const CATEGORY_BY_LEVEL = {
   [LEVELS.LEADERSHIP]: "Executive Board",
   [LEVELS.CORE]: "Core Team",
   [LEVELS.EXECUTIVE]: "Domain Leads",
-  [LEVELS.WEB_DEV]: "Web Development Team",
+  [LEVELS.WEB_DEV]: "Abhyudaya Developers",
 };
 
 /**
@@ -188,11 +196,12 @@ export function normalizeMember(member, index = 0) {
 
   let level = hasExplicitLevel ? member.level : LEVELS.EXECUTIVE;
 
-  // If level or category or department indicates Web Development, lock to WEB_DEV
+  // If level or category or department indicates Web Development / Abhyudaya Developers, lock to WEB_DEV
   if (
     member.level === LEVELS.WEB_DEV ||
     lowerCategory.includes("web dev") ||
     lowerCategory.includes("web development") ||
+    lowerCategory.includes("abhyudaya developer") ||
     explicitDept.toLowerCase() === "web development" ||
     explicitDept.toLowerCase() === "web dev"
   ) {
@@ -324,7 +333,8 @@ export function groupTeamMembers(members = []) {
         m.level === LEVELS.WEB_DEV ||
         m.department === "Web Development" ||
         (m.category || "").toLowerCase().includes("web dev") ||
-        (m.category || "").toLowerCase().includes("web development")
+        (m.category || "").toLowerCase().includes("web development") ||
+        (m.category || "").toLowerCase().includes("abhyudaya developer")
     )
     .sort(byOrder);
 

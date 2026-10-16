@@ -249,11 +249,38 @@ service cloud.firestore {
     // ============================================================
     // TEAM
     // Public: read.
-    // Admins: full CRUD.
+    // Admins (super_admin): full CRUD with Abhyudaya Developers protections.
     // ============================================================
+
+    // Helper: a document is a protected Abhyudaya Developers profile.
+    function isAbhyudayaDev(data) {
+      return data.get('level', '') == 'web-dev';
+    }
+
     match /team/{memberId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin(['super_admin']);
+
+      // Create: if level is web-dev, year must be "2026".
+      allow create: if isAdmin(['super_admin'])
+        && (
+          !isAbhyudayaDev(request.resource.data)
+          || request.resource.data.get('year', '') == '2026'
+        );
+
+      // Update: cannot change level away from web-dev, and year must stay "2026".
+      allow update: if isAdmin(['super_admin'])
+        && (
+          // Non-WEB_DEV member: allow any update
+          (!isAbhyudayaDev(resource.data) && !isAbhyudayaDev(request.resource.data))
+          // WEB_DEV member: year must stay 2026 and level must stay web-dev
+          || (
+            isAbhyudayaDev(resource.data)
+            && request.resource.data.get('year', '') == '2026'
+            && request.resource.data.get('level', '') == 'web-dev'
+          )
+        );
+
+      allow delete: if isAdmin(['super_admin']);
     }
 
     // ============================================================

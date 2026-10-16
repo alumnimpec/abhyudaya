@@ -10,6 +10,7 @@ import {
   EXECUTIVE_DEPARTMENTS,
   ROLE_PRESETS,
   isValidUrl,
+  ABHYUDAYA_DEV_FIXED_YEAR,
 } from "../../components/team/teamUtils";
 import {
   getTeamMembers,
@@ -20,6 +21,9 @@ import {
   getTeamYears,
   addTeamYear,
   DEFAULT_TEAM_YEARS,
+  batchUpdateTeamMembersActive,
+  batchMoveTeamMembersYear,
+  batchDeleteTeamMembers,
 } from "./services/teamService";
 import {
   FaLinkedin,
@@ -50,6 +54,15 @@ import {
   FaCalendarAlt,
   FaCalendarPlus,
   FaCheck,
+  FaFileCsv,
+  FaPrint,
+  FaCheckSquare,
+  FaSquare,
+  FaExchangeAlt,
+  FaInstagram,
+  FaGlobe,
+  FaQuoteLeft,
+  FaStar,
 } from "react-icons/fa";
 import "./style/admin.css";
 import "./Team.css";
@@ -62,8 +75,12 @@ const INITIAL_FORM_STATE = {
   category: "Executive Board",
   linkedin: "",
   github: "",
+  instagram: "",
+  website: "",
   email: "",
   bio: "",
+  quote: "",
+  featured: false,
   order: 1,
   image: "",
   active: true,
@@ -86,11 +103,21 @@ export default function Team() {
   const [newYearInput, setNewYearInput] = useState("");
   const [isAddingYear, setIsAddingYear] = useState(false);
 
-  // Search, Filter & View Mode
+  // Search, Filter, Sort & View Mode
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("ALL"); // ALL, LEADERSHIP, CORE, EXECUTIVE, FACULTY, ACTIVE, INACTIVE
+  const [activeTab, setActiveTab] = useState("ALL"); // ALL, LEADERSHIP, CORE, EXECUTIVE, FACULTY, ACTIVE, INACTIVE, WEB_DEV
   const [selectedDept, setSelectedDept] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL, ACTIVE, INACTIVE
+  const [sortBy, setSortBy] = useState("order"); // order, name_asc, name_desc, role, dept
   const [viewMode, setViewMode] = useState("grid"); // grid | table
+
+  // Multi-Selection State
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [showMoveYearModal, setShowMoveYearModal] = useState(false);
+  const [targetMoveYear, setTargetMoveYear] = useState("");
+  const [isMovingYear, setIsMovingYear] = useState(false);
+  const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
 
   // Drawer / Form State
   const [showDrawer, setShowDrawer] = useState(false);
@@ -109,6 +136,11 @@ export default function Team() {
   const [deleteModalMember, setDeleteModalMember] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+
+  // Clear selections when switching academic year
+  useEffect(() => {
+    setSelectedMemberIds([]);
+  }, [selectedYear]);
 
   // Load team data & years from Firestore
   const loadData = useCallback(async () => {
@@ -216,7 +248,7 @@ export default function Team() {
   const filteredMembers = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
-    return yearMembers.filter((m) => {
+    const list = yearMembers.filter((m) => {
       // Search matching (name, role, department, email, bio)
       if (query) {
         const nameMatch = (m.name || "").toLowerCase().includes(query);
@@ -234,6 +266,10 @@ export default function Team() {
         return false;
       }
 
+      // Status filter dropdown
+      if (statusFilter === "ACTIVE" && m.active === false) return false;
+      if (statusFilter === "INACTIVE" && m.active !== false) return false;
+
       // Tab filter
       if (activeTab === "ALL") return true;
       if (activeTab === "ACTIVE") return m.active !== false;
@@ -248,14 +284,226 @@ export default function Team() {
 
       return true;
     });
-  }, [yearMembers, searchTerm, selectedDept, activeTab]);
 
-  const hasActiveFilters = searchTerm !== "" || activeTab !== "ALL" || selectedDept !== "ALL";
+    // Apply sort
+    return [...list].sort((a, b) => {
+      if (sortBy === "order") {
+        return (Number(a.order) || 99) - (Number(b.order) || 99);
+      }
+      if (sortBy === "name_asc") {
+        return (a.name || "").localeCompare(b.name || "");
+      }
+      if (sortBy === "name_desc") {
+        return (b.name || "").localeCompare(a.name || "");
+      }
+      if (sortBy === "role") {
+        return (a.role || "").localeCompare(b.role || "");
+      }
+      if (sortBy === "dept") {
+        return (a.department || "").localeCompare(b.department || "");
+      }
+      return 0;
+    });
+  }, [yearMembers, searchTerm, selectedDept, statusFilter, activeTab, sortBy]);
+
+  const hasActiveFilters =
+    searchTerm !== "" ||
+    activeTab !== "ALL" ||
+    selectedDept !== "ALL" ||
+    statusFilter !== "ALL" ||
+    sortBy !== "order";
 
   const handleResetFilters = () => {
     setSearchTerm("");
     setActiveTab("ALL");
     setSelectedDept("ALL");
+    setStatusFilter("ALL");
+    setSortBy("order");
+  };
+
+  // Multi-Selection Handlers
+  const handleToggleSelectMember = (id) => {
+    setSelectedMemberIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllVisible = () => {
+    const visibleIds = filteredMembers.map((m) => m.id);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedMemberIds.includes(id));
+    if (allSelected) {
+      setSelectedMemberIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedMemberIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedMemberIds([]);
+  };
+
+  // Bulk Status Update (Activate / Deactivate)
+  const handleBatchToggleActive = async (newActive) => {
+    if (selectedMemberIds.length === 0) return;
+    try {
+      await batchUpdateTeamMembersActive(selectedMemberIds, newActive);
+      setMembers((prev) =>
+        prev.map((m) =>
+          selectedMemberIds.includes(m.id) ? { ...m, active: newActive } : m
+        )
+      );
+      toast.success(
+        newActive
+          ? `Activated ${selectedMemberIds.length} member(s).`
+          : `Unpublished/Hidden ${selectedMemberIds.length} member(s).`
+      );
+    } catch (err) {
+      console.error("Batch toggle active error:", err);
+      toast.error("Failed to update status for selected members.");
+    }
+  };
+
+  // Bulk Move Year Handler with Strict Abhyudaya Developers Protection
+  const handleOpenMoveYearModal = () => {
+    const selectedMembers = yearMembers.filter((m) => selectedMemberIds.includes(m.id));
+    const allAreDevs = selectedMembers.every(
+      (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
+    );
+
+    if (allAreDevs) {
+      toast.error(
+        `Abhyudaya Developers profiles are permanently locked to Academic Year ${ABHYUDAYA_DEV_FIXED_YEAR} and cannot be moved to another academic year.`
+      );
+      return;
+    }
+
+    const defaultTarget = availableYears.find((y) => y !== selectedYear) || "2027";
+    setTargetMoveYear(defaultTarget);
+    setShowMoveYearModal(true);
+  };
+
+  const handleConfirmMoveYear = async () => {
+    const selectedMembers = yearMembers.filter((m) => selectedMemberIds.includes(m.id));
+    const eligibleMembers = selectedMembers.filter(
+      (m) => m.level !== LEVELS.WEB_DEV && m.department !== "Web Development"
+    );
+    const devMembers = selectedMembers.filter(
+      (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
+    );
+
+    if (eligibleMembers.length === 0) {
+      toast.error(
+        `Abhyudaya Developers profiles are permanently locked to Academic Year ${ABHYUDAYA_DEV_FIXED_YEAR} and cannot be moved.`
+      );
+      setShowMoveYearModal(false);
+      return;
+    }
+
+    try {
+      setIsMovingYear(true);
+      await batchMoveTeamMembersYear(eligibleMembers, targetMoveYear);
+
+      // Update local state
+      setMembers((prev) =>
+        prev.map((m) => {
+          if (eligibleMembers.some((em) => em.id === m.id)) {
+            return { ...m, year: targetMoveYear, batch: targetMoveYear };
+          }
+          return m;
+        })
+      );
+
+      setSelectedMemberIds([]);
+      setShowMoveYearModal(false);
+
+      if (devMembers.length > 0) {
+        toast.info(
+          `Moved ${eligibleMembers.length} member(s) to AY ${targetMoveYear}. Note: ${devMembers.length} Abhyudaya Developer profile(s) were protected and kept in AY ${ABHYUDAYA_DEV_FIXED_YEAR}.`
+        );
+      } else {
+        toast.success(`Successfully moved ${eligibleMembers.length} member(s) to AY ${targetMoveYear}.`);
+      }
+    } catch (err) {
+      console.error("Batch move error:", err);
+      toast.error(err.message || "Failed to move members to target year.");
+    } finally {
+      setIsMovingYear(false);
+    }
+  };
+
+  // Bulk Delete Handler
+  const handleConfirmBatchDelete = async () => {
+    if (selectedMemberIds.length === 0) return;
+    try {
+      setIsBatchDeleting(true);
+      await batchDeleteTeamMembers(selectedMemberIds);
+      setMembers((prev) => prev.filter((m) => !selectedMemberIds.includes(m.id)));
+      toast.success(`Permanently deleted ${selectedMemberIds.length} member(s).`);
+      setSelectedMemberIds([]);
+      setShowBatchDeleteModal(false);
+    } catch (err) {
+      console.error("Batch delete error:", err);
+      toast.error(err.message || "Failed to delete selected members.");
+    } finally {
+      setIsBatchDeleting(false);
+    }
+  };
+
+  // Export CSV Handler
+  const handleExportCSV = () => {
+    if (yearMembers.length === 0) {
+      toast.info(`No team members to export for ${selectedYear}.`);
+      return;
+    }
+    const headers = [
+      "ID",
+      "Name",
+      "Role",
+      "Level",
+      "Department",
+      "Academic Year",
+      "Email",
+      "Display Order",
+      "Status",
+      "LinkedIn",
+      "GitHub",
+      "Instagram",
+      "Website",
+    ];
+    const escapeCsv = (val) => {
+      const str = String(val ?? "");
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+    const rows = yearMembers.map((m) => [
+      m.id || "",
+      m.name || "",
+      m.role || "",
+      m.level || "",
+      m.department || "",
+      m.year || selectedYear,
+      m.email || "",
+      m.order ?? 99,
+      m.active !== false ? "Active" : "Inactive",
+      m.linkedin || "",
+      m.github || "",
+      m.instagram || "",
+      m.website || "",
+    ]);
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((r) => r.map(escapeCsv).join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `abhyudaya-team-${selectedYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success(`Exported ${yearMembers.length} profiles for AY ${selectedYear} to CSV.`);
   };
 
   // Form Management
@@ -297,8 +545,12 @@ export default function Team() {
         year: memberYear,
         linkedin: member.linkedin || "",
         github: member.github || "",
+        instagram: member.instagram || "",
+        website: member.website || "",
         email: member.email || "",
         bio: member.bio || "",
+        quote: member.quote || "",
+        featured: Boolean(member.featured),
         order: member.order !== undefined && member.order !== null ? Number(member.order) : 1,
         image: member.image || "",
         active: member.active === false ? false : true,
@@ -400,6 +652,8 @@ export default function Team() {
         department: preset.department,
         category: preset.category,
         github: preset.level === LEVELS.FACULTY_ADVISOR ? "" : prev.github,
+        // Auto-lock year to 2026 for Abhyudaya Developers preset roles
+        year: preset.level === LEVELS.WEB_DEV ? ABHYUDAYA_DEV_FIXED_YEAR : prev.year,
       }));
     }
   };
@@ -408,10 +662,17 @@ export default function Team() {
     const { name, value, type, checked } = e.target;
     setIsFormDirty(true);
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      };
+      // Auto-lock year to 2026 when level is switched to Abhyudaya Developers
+      if (name === "level" && value === LEVELS.WEB_DEV) {
+        updated.year = ABHYUDAYA_DEV_FIXED_YEAR;
+      }
+      return updated;
+    });
 
     if (name === "image") {
       setImagePreview(value);
@@ -487,9 +748,20 @@ export default function Team() {
       toast.error("Please enter a valid GitHub URL (e.g. https://github.com/username).");
       return;
     }
+    if (formData.instagram && !isValidUrl(formData.instagram)) {
+      toast.error("Please enter a valid Instagram URL (e.g. https://instagram.com/username).");
+      return;
+    }
+    if (formData.website && !isValidUrl(formData.website)) {
+      toast.error("Please enter a valid Website URL (e.g. https://example.com).");
+      return;
+    }
 
     setSaving(true);
-    const targetYear = String(formData.year || selectedYear).trim();
+    // Abhyudaya Developers: always lock year to 2026 regardless of what the form reports
+    const targetYear = formData.level === LEVELS.WEB_DEV
+      ? ABHYUDAYA_DEV_FIXED_YEAR
+      : String(formData.year || selectedYear).trim();
     try {
       if (editingMember) {
         await updateTeamMember(editingMember.id, { ...formData, year: targetYear }, selectedFile);
@@ -572,6 +844,8 @@ export default function Team() {
   };
 
   const isFacultyRole = formData.level === LEVELS.FACULTY_ADVISOR;
+  /** Abhyudaya Developers members are permanently locked to AY 2026. */
+  const isAbhyudayaDev = formData.level === LEVELS.WEB_DEV;
 
   // Helper for tier color badges
   const getTierBadgeClass = (level) => {
@@ -600,51 +874,53 @@ export default function Team() {
           <div className="admin-team-page">
             {/* 1. Header with Breadcrumb, Year Selector & Primary CTA */}
             <div className="team-header-container">
-              <div>
-                <div className="team-breadcrumb">
+              <div className="team-header-main">
+                <nav className="team-breadcrumb" aria-label="Breadcrumb">
                   <Link to="/admin/dashboard">Dashboard</Link>
                   <span className="team-breadcrumb-sep">/</span>
                   <span>Team Management</span>
                   <span className="team-breadcrumb-sep">/</span>
-                  <span className="team-year-badge-breadcrumb">{selectedYear}</span>
-                </div>
+                  <span className="team-year-badge-breadcrumb">AY {selectedYear}</span>
+                </nav>
                 <div className="team-title-row">
-                  <h1>Team Management</h1>
+                  <h1 className="team-heading">Team Management</h1>
                   <span className="team-count-badge">
-                    <FaUsers /> {yearMembers.length} {yearMembers.length === 1 ? "Member" : "Members"} ({selectedYear})
+                    <FaUsers /> {yearMembers.length} {yearMembers.length === 1 ? "Member" : "Members"} &bull; AY {selectedYear}
                   </span>
                 </div>
                 <p className="team-header-desc">
-                  Manage faculty coordinators, student leadership, domain leads, executives, and website visibility for academic year {selectedYear}.
+                  Institutional administration directory for faculty advisors, student leadership, domain leads, and executive committees for academic year {selectedYear}.
                 </p>
               </div>
 
               <div className="team-header-actions">
-                {/* Dynamic Year Selector & Add Year Toolbar */}
+                {/* Academic Year Control Group */}
                 <div className="team-year-picker-container">
                   <label htmlFor="team-year-selector-admin" className="team-year-picker-label">
-                    <FaCalendarAlt /> Year:
+                    <FaCalendarAlt /> Academic Year:
                   </label>
-                  <select
-                    id="team-year-selector-admin"
-                    className="team-year-picker-select"
-                    value={selectedYear}
-                    onChange={(e) => {
-                      if (e.target.value === "__add_new__") {
-                        handleOpenAddYearModal();
-                      } else {
-                        setSelectedYear(e.target.value);
-                      }
-                    }}
-                    title="Choose academic or executive year to manage"
-                  >
-                    {availableYears.map((yr) => (
-                      <option key={yr} value={yr}>
-                        {yr} {yr === "2026" ? "(Current)" : ""}
-                      </option>
-                    ))}
-                    <option value="__add_new__">+ Add New Year...</option>
-                  </select>
+                  <div className="team-year-select-wrap">
+                    <select
+                      id="team-year-selector-admin"
+                      className="team-year-picker-select"
+                      value={selectedYear}
+                      onChange={(e) => {
+                        if (e.target.value === "__add_new__") {
+                          handleOpenAddYearModal();
+                        } else {
+                          setSelectedYear(e.target.value);
+                        }
+                      }}
+                      title="Choose academic or executive year to manage"
+                    >
+                      {availableYears.map((yr) => (
+                        <option key={yr} value={yr}>
+                          AY {yr} {yr === "2026" ? "(Current)" : ""}
+                        </option>
+                      ))}
+                      <option value="__add_new__">+ Add New Year...</option>
+                    </select>
+                  </div>
 
                   <button
                     type="button"
@@ -656,12 +932,31 @@ export default function Team() {
                   </button>
                 </div>
 
+                <div className="team-export-dropdown-wrap">
+                  <button
+                    type="button"
+                    className="team-btn-secondary"
+                    onClick={handleExportCSV}
+                    title="Export academic year roster to CSV"
+                  >
+                    <FaFileCsv /> Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="team-btn-secondary"
+                    onClick={() => window.print()}
+                    title="Print or export PDF of roster"
+                  >
+                    <FaPrint /> Print
+                  </button>
+                </div>
+
                 <a
                   href={`/team?year=${selectedYear}`}
                   target="_blank"
                   rel="noreferrer"
                   className="team-btn-secondary"
-                  title="Preview public team page for this year"
+                  title="Preview official public team page for this year"
                 >
                   <FaExternalLinkAlt /> View Public Page
                 </a>
@@ -675,152 +970,147 @@ export default function Team() {
               </div>
             </div>
 
-            {/* 2. Interactive Statistics Metrics Bar */}
-            <div className="team-stats-grid">
+            {/* 2. Compact Institutional Summary Section */}
+            <div className="team-roster-summary" role="region" aria-label="Team Summary Statistics">
               <div
-                className={`team-stat-card stat-all ${activeTab === "ALL" && !hasActiveFilters ? "active-stat" : ""}`}
+                className={`team-summary-item ${activeTab === "ALL" && !hasActiveFilters ? "active" : ""}`}
                 onClick={() => {
                   setActiveTab("ALL");
                   setSelectedDept("ALL");
                 }}
-                title="View all members"
+                role="button"
+                tabIndex={0}
+                title="View total roster"
               >
-                <div className="team-stat-top">
-                  <span className="team-stat-label">Total Roster</span>
-                  <div className="team-stat-icon icon-blue">
-                    <FaUsers />
-                  </div>
+                <div className="team-summary-icon icon-total">
+                  <FaUsers />
                 </div>
-                <div className="team-stat-value">{stats.total}</div>
-                <div className="team-stat-sub">All club team members</div>
+                <div className="team-summary-data">
+                  <span className="team-summary-num">{stats.total}</span>
+                  <span className="team-summary-label">Total Roster</span>
+                </div>
               </div>
 
+              <div className="team-summary-divider" />
+
               <div
-                className={`team-stat-card stat-active ${activeTab === "ACTIVE" ? "active-stat" : ""}`}
+                className={`team-summary-item ${activeTab === "ACTIVE" ? "active" : ""}`}
                 onClick={() => setActiveTab("ACTIVE")}
+                role="button"
+                tabIndex={0}
                 title="Filter active public members"
               >
-                <div className="team-stat-top">
-                  <span className="team-stat-label" style={{ color: "#4ade80" }}>
-                    Active Public
-                  </span>
-                  <div className="team-stat-icon icon-green">
-                    <FaUserCheck />
-                  </div>
+                <div className="team-summary-icon icon-active">
+                  <FaUserCheck />
                 </div>
-                <div className="team-stat-value" style={{ color: "#4ade80" }}>
-                  {stats.activeCount}
+                <div className="team-summary-data">
+                  <span className="team-summary-num">{stats.activeCount}</span>
+                  <span className="team-summary-label">Active / Public</span>
                 </div>
-                <div className="team-stat-sub">Visible on website</div>
               </div>
 
+              <div className="team-summary-divider" />
+
               <div
-                className={`team-stat-card stat-leadership ${activeTab === "LEADERSHIP" ? "active-stat" : ""}`}
+                className={`team-summary-item ${activeTab === "LEADERSHIP" ? "active" : ""}`}
                 onClick={() => setActiveTab("LEADERSHIP")}
+                role="button"
+                tabIndex={0}
                 title="Filter student leadership"
               >
-                <div className="team-stat-top">
-                  <span className="team-stat-label" style={{ color: "#facc15" }}>
-                    Leadership
-                  </span>
-                  <div className="team-stat-icon icon-gold">
-                    <FaCrown />
-                  </div>
+                <div className="team-summary-icon icon-leadership">
+                  <FaCrown />
                 </div>
-                <div className="team-stat-value" style={{ color: "#facc15" }}>
-                  {stats.leadershipCount}
+                <div className="team-summary-data">
+                  <span className="team-summary-num">{stats.leadershipCount}</span>
+                  <span className="team-summary-label">Leadership</span>
                 </div>
-                <div className="team-stat-sub">Presidents &amp; Secs</div>
               </div>
 
+              <div className="team-summary-divider" />
+
               <div
-                className={`team-stat-card stat-core ${activeTab === "CORE" ? "active-stat" : ""}`}
+                className={`team-summary-item ${activeTab === "CORE" ? "active" : ""}`}
                 onClick={() => setActiveTab("CORE")}
+                role="button"
+                tabIndex={0}
                 title="Filter core domain leads"
               >
-                <div className="team-stat-top">
-                  <span className="team-stat-label" style={{ color: "#38bdf8" }}>
-                    Core Leads
-                  </span>
-                  <div className="team-stat-icon icon-cyan">
-                    <FaUserTie />
-                  </div>
+                <div className="team-summary-icon icon-core">
+                  <FaUserTie />
                 </div>
-                <div className="team-stat-value" style={{ color: "#38bdf8" }}>
-                  {stats.coreCount}
+                <div className="team-summary-data">
+                  <span className="team-summary-num">{stats.coreCount}</span>
+                  <span className="team-summary-label">Core Leads</span>
                 </div>
-                <div className="team-stat-sub">Tech, Ops &amp; PR Leads</div>
               </div>
 
+              <div className="team-summary-divider" />
+
               <div
-                className={`team-stat-card stat-exec ${activeTab === "EXECUTIVE" ? "active-stat" : ""}`}
+                className={`team-summary-item ${activeTab === "EXECUTIVE" ? "active" : ""}`}
                 onClick={() => setActiveTab("EXECUTIVE")}
-                title="Filter department executives"
+                role="button"
+                tabIndex={0}
+                title="Filter domain executives"
               >
-                <div className="team-stat-top">
-                  <span className="team-stat-label" style={{ color: "#c084fc" }}>
-                    Executives
-                  </span>
-                  <div className="team-stat-icon icon-purple">
-                    <FaAward />
-                  </div>
+                <div className="team-summary-icon icon-exec">
+                  <FaAward />
                 </div>
-                <div className="team-stat-value" style={{ color: "#c084fc" }}>
-                  {stats.execCount}
+                <div className="team-summary-data">
+                  <span className="team-summary-num">{stats.execCount}</span>
+                  <span className="team-summary-label">Executives</span>
                 </div>
-                <div className="team-stat-sub">Domain Committee</div>
               </div>
 
+              <div className="team-summary-divider" />
+
               <div
-                className={`team-stat-card stat-webdev ${activeTab === "WEB_DEV" ? "active-stat" : ""}`}
+                className={`team-summary-item ${activeTab === "WEB_DEV" ? "active" : ""}`}
                 onClick={() => setActiveTab("WEB_DEV")}
-                title="Filter web development team"
+                role="button"
+                tabIndex={0}
+                title="Filter Abhyudaya Developers"
               >
-                <div className="team-stat-top">
-                  <span className="team-stat-label" style={{ color: "#38bdf8" }}>
-                    Web Dev
-                  </span>
-                  <div className="team-stat-icon icon-webdev">
-                    <FaLaptopCode />
-                  </div>
+                <div className="team-summary-icon icon-webdev">
+                  <FaLaptopCode />
                 </div>
-                <div className="team-stat-value" style={{ color: "#38bdf8" }}>
-                  {stats.webDevCount}
+                <div className="team-summary-data">
+                  <span className="team-summary-num">{stats.webDevCount}</span>
+                  <span className="team-summary-label">Abhyudaya Developers</span>
                 </div>
-                <div className="team-stat-sub">Web Development Team</div>
               </div>
 
+              <div className="team-summary-divider" />
+
               <div
-                className={`team-stat-card stat-faculty ${activeTab === "FACULTY" ? "active-stat" : ""}`}
+                className={`team-summary-item ${activeTab === "FACULTY" ? "active" : ""}`}
                 onClick={() => setActiveTab("FACULTY")}
-                title="Filter faculty advisor"
+                role="button"
+                tabIndex={0}
+                title="Filter faculty advisors"
               >
-                <div className="team-stat-top">
-                  <span className="team-stat-label" style={{ color: "#f472b6" }}>
-                    Faculty
-                  </span>
-                  <div className="team-stat-icon icon-pink">
-                    <FaChalkboardTeacher />
-                  </div>
+                <div className="team-summary-icon icon-faculty">
+                  <FaChalkboardTeacher />
                 </div>
-                <div className="team-stat-value" style={{ color: "#f472b6" }}>
-                  {stats.facultyCount}
+                <div className="team-summary-data">
+                  <span className="team-summary-num">{stats.facultyCount}</span>
+                  <span className="team-summary-label">Faculty</span>
                 </div>
-                <div className="team-stat-sub">Faculty Coordinator</div>
               </div>
             </div>
 
-            {/* 3. Controls Bar: Search, Category Tabs, Dept filter, and View toggle */}
+            {/* 3. Controls Bar: Category Tabs, Search, Dept filter, and View toggle */}
             <div className="team-controls-panel">
               {/* Category Filter Tabs */}
               <div className="team-controls-top">
                 <div className="team-filter-tabs">
                   {[
-                    { id: "ALL", label: "All" },
+                    { id: "ALL", label: "All Members" },
                     { id: "LEADERSHIP", label: "Leadership" },
                     { id: "CORE", label: "Core Leads" },
                     { id: "EXECUTIVE", label: "Executives" },
-                    { id: "WEB_DEV", label: "Web Dev" },
+                    { id: "WEB_DEV", label: "Abhyudaya Developers" },
                     { id: "FACULTY", label: "Faculty" },
                     { id: "ACTIVE", label: "Active" },
                     { id: "INACTIVE", label: "Inactive" },
@@ -831,7 +1121,7 @@ export default function Team() {
                       className={`team-tab-btn ${activeTab === tab.id ? "active" : ""}`}
                       onClick={() => setActiveTab(tab.id)}
                     >
-                      <span>{tab.label}</span>
+                      <span className="team-tab-label">{tab.label}</span>
                       <span className="team-tab-count">{getTabCount(tab.id)}</span>
                     </button>
                   ))}
@@ -840,9 +1130,8 @@ export default function Team() {
                 <button
                   type="button"
                   onClick={loadData}
-                  className="team-btn-secondary"
-                  style={{ padding: "7px 12px", fontSize: "12px" }}
-                  title="Refresh team members from database"
+                  className="team-btn-refresh"
+                  title="Synchronize team members from database"
                 >
                   <FaRedo /> Refresh
                 </button>
@@ -884,6 +1173,30 @@ export default function Team() {
                         {dept}
                       </option>
                     ))}
+                  </select>
+
+                  <select
+                    className="team-status-select"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    title="Filter by Status"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="ACTIVE">Active (Public)</option>
+                    <option value="INACTIVE">Inactive (Hidden)</option>
+                  </select>
+
+                  <select
+                    className="team-sort-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    title="Sort members roster"
+                  >
+                    <option value="order">Sort: Display Order</option>
+                    <option value="name_asc">Sort: Name (A – Z)</option>
+                    <option value="name_desc">Sort: Name (Z – A)</option>
+                    <option value="role">Sort: Designation</option>
+                    <option value="dept">Sort: Department</option>
                   </select>
                 </div>
 
@@ -974,12 +1287,25 @@ export default function Team() {
                 {filteredMembers.map((member) => {
                   const isActive = member.active !== false;
                   const tierClass = getTierBadgeClass(member.level);
+                  const isSelected = selectedMemberIds.includes(member.id);
 
                   return (
                     <div
                       key={member.id}
-                      className={`team-card ${!isActive ? "inactive-card" : ""}`}
+                      className={`team-card ${!isActive ? "inactive-card" : ""} ${isSelected ? "selected-card" : ""}`}
                     >
+                      {/* Selection Checkbox */}
+                      <div
+                        className={`team-card-select-btn ${isSelected ? "selected" : ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSelectMember(member.id);
+                        }}
+                        title={isSelected ? "Deselect member" : "Select member"}
+                      >
+                        {isSelected ? <FaCheckSquare /> : <FaSquare />}
+                      </div>
+
                       {/* Image & Header Badges */}
                       <div className="team-card-image-wrap">
                         {member.image ? (
@@ -1113,6 +1439,17 @@ export default function Team() {
                   <table className="team-data-table">
                     <thead>
                       <tr>
+                        <th style={{ width: "36px", textAlign: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={
+                              filteredMembers.length > 0 &&
+                              filteredMembers.every((m) => selectedMemberIds.includes(m.id))
+                            }
+                            onChange={handleSelectAllVisible}
+                            title="Select or deselect all visible members"
+                          />
+                        </th>
                         <th>Member</th>
                         <th>Role &amp; Tier</th>
                         <th>Department</th>
@@ -1126,12 +1463,21 @@ export default function Team() {
                       {filteredMembers.map((member) => {
                         const isActive = member.active !== false;
                         const tierClass = getTierBadgeClass(member.level);
+                        const isSelected = selectedMemberIds.includes(member.id);
 
                         return (
                           <tr
                             key={member.id}
-                            className={!isActive ? "inactive-row" : ""}
+                            className={`${!isActive ? "inactive-row" : ""} ${isSelected ? "selected-row" : ""}`}
                           >
+                            <td style={{ textAlign: "center" }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleToggleSelectMember(member.id)}
+                                title={isSelected ? "Deselect member" : "Select member"}
+                              />
+                            </td>
                             <td>
                               <div className="team-table-member-cell">
                                 {member.image ? (
@@ -1155,7 +1501,7 @@ export default function Team() {
                             </td>
 
                             <td>
-                              <div style={{ fontWeight: "600", color: "#f8fafc" }}>
+                              <div className="team-table-role">
                                 {member.role}
                               </div>
                               <span
@@ -1253,6 +1599,73 @@ export default function Team() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* Multi-Select Floating Action Bar */}
+            {selectedMemberIds.length > 0 && (
+              <div
+                className="team-multiselect-bar"
+                role="toolbar"
+                aria-label="Bulk actions for selected members"
+              >
+                <div className="team-multiselect-left">
+                  <span className="team-multiselect-count-badge">
+                    {selectedMemberIds.length}
+                  </span>
+                  <span className="team-multiselect-text">
+                    {selectedMemberIds.length === 1
+                      ? "1 member selected"
+                      : `${selectedMemberIds.length} members selected`}
+                  </span>
+                </div>
+
+                <div className="team-multiselect-actions">
+                  <button
+                    type="button"
+                    className="team-multiselect-btn btn-publish"
+                    onClick={() => handleBatchToggleActive(true)}
+                    title="Publish/Activate selected members"
+                  >
+                    <FaToggleOn /> Publish Selected
+                  </button>
+
+                  <button
+                    type="button"
+                    className="team-multiselect-btn btn-unpublish"
+                    onClick={() => handleBatchToggleActive(false)}
+                    title="Unpublish/Hide selected members"
+                  >
+                    <FaToggleOff /> Unpublish Selected
+                  </button>
+
+                  <button
+                    type="button"
+                    className="team-multiselect-btn btn-move"
+                    onClick={handleOpenMoveYearModal}
+                    title="Move selected members to another academic year (Abhyudaya Developers are protected)"
+                  >
+                    <FaExchangeAlt /> Move Year
+                  </button>
+
+                  <button
+                    type="button"
+                    className="team-multiselect-btn btn-delete"
+                    onClick={() => setShowBatchDeleteModal(true)}
+                    title="Delete selected members"
+                  >
+                    <FaTrash /> Delete Selected
+                  </button>
+
+                  <button
+                    type="button"
+                    className="team-multiselect-btn btn-clear"
+                    onClick={handleClearSelection}
+                    title="Deselect all"
+                  >
+                    <FaTimes /> Deselect
+                  </button>
                 </div>
               </div>
             )}
@@ -1404,6 +1817,21 @@ export default function Team() {
                         onChange={handleInputChange}
                       />
                     </div>
+
+                    <div className="team-form-group">
+                      <label className="team-form-label">
+                        <FaQuoteLeft style={{ marginRight: "6px", color: "var(--admin-gold)" }} />
+                        Personal Quote / Motto
+                      </label>
+                      <input
+                        type="text"
+                        name="quote"
+                        className="team-form-input"
+                        placeholder='e.g. "Innovate, build, and inspire the future."'
+                        value={formData.quote || ""}
+                        onChange={handleInputChange}
+                      />
+                    </div>
                   </div>
 
                   {/* SECTION 2: ROLE & VERTICAL */}
@@ -1432,7 +1860,7 @@ export default function Team() {
                           <option value="Technical Lead">Technical Lead</option>
                           <option value="PR Lead">PR Lead</option>
                         </optgroup>
-                        <optgroup label="Web Development Team">
+                        <optgroup label="Abhyudaya Developers">
                           <option value="Web Developer">Web Developer</option>
                           <option value="Frontend Developer">Frontend Developer</option>
                           <option value="Full Stack Developer">Full Stack Developer</option>
@@ -1479,7 +1907,7 @@ export default function Team() {
                           <option value={LEVELS.LEADERSHIP}>The Leadership</option>
                           <option value={LEVELS.CORE}>Core Team</option>
                           <option value={LEVELS.EXECUTIVE}>Executive</option>
-                          <option value={LEVELS.WEB_DEV}>Web Development Team</option>
+                          <option value={LEVELS.WEB_DEV}>Abhyudaya Developers</option>
                         </select>
                       </div>
 
@@ -1507,20 +1935,30 @@ export default function Team() {
                         <label className="team-form-label">
                           Academic / Team Year <span className="team-form-required">*</span>
                         </label>
-                        <select
-                          name="year"
-                          className="team-form-select"
-                          value={formData.year}
-                          onChange={handleInputChange}
-                        >
-                          {availableYears.map((yr) => (
-                            <option key={yr} value={yr}>
-                              {yr} {yr === "2026" ? "(Current)" : ""}
-                            </option>
-                          ))}
-                        </select>
+                        {isAbhyudayaDev ? (
+                          /* Abhyudaya Developers are permanently locked to AY 2026 */
+                          <div className="team-form-locked-field">
+                            <span className="team-form-locked-value">2026 (Current)</span>
+                            <span className="team-form-locked-badge">Protected</span>
+                          </div>
+                        ) : (
+                          <select
+                            name="year"
+                            className="team-form-select"
+                            value={formData.year}
+                            onChange={handleInputChange}
+                          >
+                            {availableYears.map((yr) => (
+                              <option key={yr} value={yr}>
+                                {yr} {yr === "2026" ? "(Current)" : ""}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         <span className="team-form-hint">
-                          Profile will be published under the {formData.year} roster.
+                          {isAbhyudayaDev
+                            ? "Abhyudaya Developers are permanently associated with Academic Year 2026."
+                            : `Profile will be published under the ${formData.year} roster.`}
                         </span>
                       </div>
 
@@ -1563,6 +2001,27 @@ export default function Team() {
                           <option value="false">Inactive (Hidden from public site)</option>
                         </select>
                       </div>
+
+                      <div className="team-form-group">
+                        <label className="team-form-label">
+                          <FaStar style={{ marginRight: "4px", color: "var(--admin-gold)" }} />
+                          Featured Spotlight
+                        </label>
+                        <select
+                          name="featured"
+                          className="team-form-select"
+                          value={formData.featured ? "true" : "false"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              featured: e.target.value === "true",
+                            }))
+                          }
+                        >
+                          <option value="false">Standard Member</option>
+                          <option value="true">Featured (Showcase Spotlight)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1589,7 +2048,7 @@ export default function Team() {
                     {!isFacultyRole && (
                       <div className="team-form-group">
                         <label className="team-form-label">
-                          <FaGithub style={{ color: "#e2e8f0" }} /> GitHub Profile URL
+                          <FaGithub /> GitHub Profile URL
                         </label>
                         <input
                           type="url"
@@ -1601,13 +2060,41 @@ export default function Team() {
                         />
                       </div>
                     )}
+
+                    <div className="team-form-group">
+                      <label className="team-form-label">
+                        <FaInstagram style={{ color: "#e1306c" }} /> Instagram Profile URL
+                      </label>
+                      <input
+                        type="url"
+                        name="instagram"
+                        className="team-form-input"
+                        placeholder="https://instagram.com/username"
+                        value={formData.instagram}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+
+                    <div className="team-form-group">
+                      <label className="team-form-label">
+                        <FaGlobe style={{ color: "#38bdf8" }} /> Portfolio / Personal Website URL
+                      </label>
+                      <input
+                        type="url"
+                        name="website"
+                        className="team-form-input"
+                        placeholder="https://viratmishra.dev"
+                        value={formData.website}
+                        onChange={handleInputChange}
+                      />
+                    </div>
                   </div>
 
                   {/* Drawer Footer Actions */}
                   <div className="team-drawer-footer">
                     <button
                       type="button"
-                      className="team-drawer-cancel-btn"
+                      className="team-drawer-btn-cancel"
                       onClick={handleCloseDrawer}
                       disabled={saving}
                     >
@@ -1615,7 +2102,7 @@ export default function Team() {
                     </button>
                     <button
                       type="submit"
-                      className="team-drawer-submit-btn"
+                      className="team-drawer-btn-save"
                       disabled={saving}
                     >
                       {saving ? (
@@ -1660,7 +2147,7 @@ export default function Team() {
                   <strong>Role:</strong> {deleteModalMember.role} ({deleteModalMember.department || "No Department"})
                   <br />
                   <strong>Current Status:</strong>{" "}
-                  <span style={{ color: deleteModalMember.active !== false ? "#4ade80" : "#f87171" }}>
+                  <span className={deleteModalMember.active !== false ? "modal-status-active" : "modal-status-inactive"}>
                     {deleteModalMember.active !== false ? "Active (Visible)" : "Inactive (Hidden)"}
                   </span>
                 </div>
@@ -1820,6 +2307,163 @@ export default function Team() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* 9. MOVE YEAR MODAL WITH ABHYUDAYA DEVELOPERS PROTECTION */}
+          {showMoveYearModal && (
+            <div
+              className="team-modal-backdrop"
+              onClick={() => !isMovingYear && setShowMoveYearModal(false)}
+            >
+              <div
+                className="team-modal-box team-add-year-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(() => {
+                  const selectedMembers = yearMembers.filter((m) =>
+                    selectedMemberIds.includes(m.id)
+                  );
+                  const devMembers = selectedMembers.filter(
+                    (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
+                  );
+                  const eligibleMembers = selectedMembers.filter(
+                    (m) => m.level !== LEVELS.WEB_DEV && m.department !== "Web Development"
+                  );
+
+                  return (
+                    <>
+                      <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+                        <div className="team-modal-icon-wrap modal-icon-primary">
+                          <FaExchangeAlt />
+                        </div>
+                        <div>
+                          <h3 className="team-modal-title">Move Members to Another Year</h3>
+                          <p className="team-modal-desc">
+                            Reassign selected member profiles from Academic Year {selectedYear} to an upcoming academic roster.
+                          </p>
+                        </div>
+                      </div>
+
+                      {devMembers.length > 0 && (
+                        <div
+                          style={{
+                            background: "#fffbeb",
+                            border: "1px solid #fde68a",
+                            padding: "10px 14px",
+                            borderRadius: "var(--admin-radius)",
+                            marginTop: "14px",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "10px",
+                          }}
+                        >
+                          <FaExclamationTriangle
+                            style={{ color: "#d97706", marginTop: "2px", flexShrink: 0 }}
+                          />
+                          <div style={{ fontSize: "12px", color: "#92400e", lineHeight: "1.45" }}>
+                            <strong>Abhyudaya Developers Protection Notice:</strong>
+                            <br />
+                            {devMembers.length} selected member(s) ({devMembers.map((d) => d.name).join(", ")}) belong to
+                            Abhyudaya Developers. They are permanently locked to Academic Year {ABHYUDAYA_DEV_FIXED_YEAR} and
+                            will be preserved in 2026. Only the other {eligibleMembers.length} member(s) will be moved.
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="team-form-group" style={{ marginTop: "16px" }}>
+                        <label className="team-form-label">
+                          Destination Academic Year ({eligibleMembers.length} members to move)
+                        </label>
+                        <select
+                          className="team-form-select"
+                          value={targetMoveYear}
+                          onChange={(e) => setTargetMoveYear(e.target.value)}
+                          disabled={isMovingYear}
+                        >
+                          {availableYears
+                            .filter((y) => y !== selectedYear)
+                            .map((yr) => (
+                              <option key={yr} value={yr}>
+                                Academic Year {yr}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      <div className="team-modal-actions" style={{ marginTop: "20px" }}>
+                        <button
+                          type="button"
+                          className="team-modal-btn-cancel"
+                          onClick={() => setShowMoveYearModal(false)}
+                          disabled={isMovingYear}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="team-btn-primary"
+                          onClick={handleConfirmMoveYear}
+                          disabled={isMovingYear || eligibleMembers.length === 0}
+                          style={{ padding: "8px 18px", fontSize: "13px" }}
+                        >
+                          {isMovingYear ? "Moving..." : `Move to AY ${targetMoveYear}`}
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* 10. BATCH DELETE CONFIRMATION MODAL */}
+          {showBatchDeleteModal && (
+            <div
+              className="team-modal-backdrop"
+              onClick={() => !isBatchDeleting && setShowBatchDeleteModal(false)}
+            >
+              <div
+                className="team-modal-box team-add-year-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+                  <div className="team-modal-icon-wrap modal-icon-danger">
+                    <FaTrash />
+                  </div>
+                  <div>
+                    <h3 className="team-modal-title">
+                      Delete {selectedMemberIds.length} Selected Members?
+                    </h3>
+                    <p className="team-modal-desc">
+                      Are you sure you want to permanently remove {selectedMemberIds.length} selected team members from Academic Year {selectedYear}?
+                    </p>
+                  </div>
+                </div>
+
+                <div className="team-modal-info-box" style={{ marginTop: "14px" }}>
+                  This action is permanent and cannot be undone. To remove members from public display without deleting their records, use &ldquo;Unpublish Selected&rdquo; instead.
+                </div>
+
+                <div className="team-modal-actions" style={{ marginTop: "20px" }}>
+                  <button
+                    type="button"
+                    className="team-modal-btn-cancel"
+                    onClick={() => setShowBatchDeleteModal(false)}
+                    disabled={isBatchDeleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="team-modal-btn-danger"
+                    onClick={handleConfirmBatchDelete}
+                    disabled={isBatchDeleting}
+                  >
+                    {isBatchDeleting ? "Deleting..." : "Permanently Delete"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
