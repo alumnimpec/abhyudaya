@@ -19,7 +19,12 @@ import ExecutiveSection from '../components/team/ExecutiveSection.jsx';
 import WebDevTeamSection from '../components/team/WebDevTeamSection.jsx';
 import TeamClosing from '../components/team/TeamClosing.jsx';
 import ProfileModal from '../components/team/ProfileModal.jsx';
-import { groupTeamMembers } from '../components/team/teamUtils.js';
+import {
+  groupTeamMembers,
+  normalizeMember,
+  isAbhyudayaDeveloper,
+  deduplicateMembers,
+} from '../components/team/teamUtils.js';
 import { markPrerenderReady } from '../utils/prerender.js';
 
 import './Team.css';
@@ -82,7 +87,23 @@ export default function Team() {
     }
   };
 
-  // Process and group team data for the selected year
+  // Shared Abhyudaya Developers — permanent, shared across ALL academic years
+  const commonDevelopers = useMemo(() => {
+    let rawDevs = dbMembers.filter(isAbhyudayaDeveloper);
+    // Fallback to static developer profiles only if database has no developer records at all
+    if (rawDevs.length === 0 && dbMembers.length === 0) {
+      rawDevs = staticTeam.webDev || [];
+    }
+    const normalized = rawDevs
+      .map((m, idx) => normalizeMember(m, idx))
+      .filter((m) => m.active !== false);
+
+    return deduplicateMembers(normalized).sort(
+      (a, b) => (Number(a.order) || 99) - (Number(b.order) || 99)
+    );
+  }, [dbMembers]);
+
+  // Process and group team data for the selected academic year (excluding common developers)
   const {
     faculty,
     mainLeadership,
@@ -90,19 +111,18 @@ export default function Team() {
     core,
     executives,
     associates,
-    webDev,
-    hasMembers,
+    hasYearMembers,
   } = useMemo(() => {
     let rawFaculty = [];
     let rawLeadership = [];
     let rawCore = [];
     let rawExecutives = [];
     let rawAssociates = [];
-    let rawWebDev = [];
     let dataFound = false;
 
-    // Filter Firestore members strictly for the currently selected year
+    // Filter regular members strictly for the selected year (excluding common developers)
     const yearMembers = dbMembers.filter((m) => {
+      if (isAbhyudayaDeveloper(m)) return false;
       const memberYear = String(
         m.year ?? m.batch ?? m.session ?? m.academicYear ?? m.teamYear ?? '2026'
       ).trim();
@@ -116,7 +136,6 @@ export default function Team() {
       rawCore = grouped.core || [];
       rawExecutives = grouped.executives || [];
       rawAssociates = grouped.associates || [];
-      rawWebDev = grouped.webDev || [];
       dataFound = true;
     } else if (selectedYear === '2026' && dbMembers.length === 0) {
       // Backward compatibility fallback to static 2026 team only if DB is empty
@@ -125,7 +144,6 @@ export default function Team() {
       rawCore = staticTeam.core || [];
       rawExecutives = staticTeam.executives || [];
       rawAssociates = staticTeam.associates || staticTeam.associateExecutives || [];
-      rawWebDev = staticTeam.webDev || [];
       dataFound = true;
     }
 
@@ -144,8 +162,7 @@ export default function Team() {
       core: rawCore,
       executives: rawExecutives,
       associates: rawAssociates,
-      webDev: rawWebDev,
-      hasMembers: dataFound,
+      hasYearMembers: dataFound,
     };
   }, [dbMembers, selectedYear]);
 
@@ -202,126 +219,130 @@ export default function Team() {
             <p>Loading team members...</p>
           </div>
         </section>
-      ) : !hasMembers ? (
-        /* EMPTY STATE: "No data found for that year." */
-        <section className="section team-empty-section">
-          <div className="wrap">
-            <div className="team-year-empty-card">
-              <div className="team-year-empty-icon" aria-hidden="true">
-                <svg
-                  width="48"
-                  height="48"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#eeb84a"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="9" cy="7" r="4"></circle>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-              </div>
-              <h2 className="team-year-empty-heading">Team Roster • {selectedYear}</h2>
-              <p className="team-year-empty">No data found for that year.</p>
-              <p className="team-year-empty-sub">
-                The student leadership and executive profiles for {selectedYear} have not been published yet. Please choose another academic year from the selector above.
-              </p>
-              {selectedYear !== '2026' && (
-                <button
-                  type="button"
-                  className="team-empty-switch-btn"
-                  onClick={() => handleYearChange('2026')}
-                >
-                  View 2026 Team Roster →
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
       ) : (
         <>
-          {/* 2. FACULTY COORDINATOR */}
-          {primaryAdvisor && (
-            <FacultyAdvisorSection
-              advisor={primaryAdvisor}
-              onSelectMember={setSelectedMember}
-            />
+          {!hasYearMembers ? (
+            /* EMPTY STATE: "No data found for that year." for year-specific members */
+            <section className="section team-empty-section">
+              <div className="wrap">
+                <div className="team-year-empty-card">
+                  <div className="team-year-empty-icon" aria-hidden="true">
+                    <svg
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#eeb84a"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                  </div>
+                  <h2 className="team-year-empty-heading">Team Roster • {selectedYear}</h2>
+                  <p className="team-year-empty">No data found for that year.</p>
+                  <p className="team-year-empty-sub">
+                    The student leadership and executive profiles for {selectedYear} have not been published yet. Please choose another academic year from the selector above.
+                  </p>
+                  {selectedYear !== '2026' && (
+                    <button
+                      type="button"
+                      className="team-empty-switch-btn"
+                      onClick={() => handleYearChange('2026')}
+                    >
+                      View 2026 Team Roster →
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+          ) : (
+            <>
+              {/* 2. FACULTY COORDINATOR */}
+              {primaryAdvisor && (
+                <FacultyAdvisorSection
+                  advisor={primaryAdvisor}
+                  onSelectMember={setSelectedMember}
+                />
+              )}
+
+              {/* 3. STUDENT LEADERSHIP (President, VP, etc. - Styled on Dark BG) */}
+              {mainLeadership.length > 0 && (
+                <div className="section-theme-wrapper section--dark">
+                  <LeadershipSection
+                    title="Student Leadership"
+                    eyebrow="Executive Officers"
+                    members={mainLeadership}
+                    selectedYear={selectedYear}
+                    onSelectMember={setSelectedMember}
+                  />
+                </div>
+              )}
+
+              {/* 4. DOMAIN & VERTICAL LEADS (Tech, Ops, PR Leads - Directly below Leadership on Dark BG) */}
+              {verticalLeads.length > 0 && (
+                <div className="section-theme-wrapper section--dark section-border-top">
+                  <LeadershipSection
+                    title="Domain &amp; Vertical Leads"
+                    eyebrow="Functional Directors"
+                    members={verticalLeads}
+                    selectedYear={selectedYear}
+                    onSelectMember={setSelectedMember}
+                  />
+                </div>
+              )}
+
+              {/* 5. CORE TEAM (Domain Leadership & Core Leads on Warm Cream BG) */}
+              {core.length > 0 && (
+                <CoreTeamSection
+                  members={core}
+                  selectedYear={selectedYear}
+                  onSelectMember={setSelectedMember}
+                />
+              )}
+
+              {/* 6. HOW ABHYUDAYA WORKS (Interactive Organizational Flow) */}
+              {(mainLeadership.length > 0 || core.length > 0) && (
+                <OrganizationStructure
+                  leadership={mainLeadership}
+                  core={core}
+                />
+              )}
+
+              {/* 7. EXECUTIVE COMMITTEE */}
+              {executives.length > 0 && (
+                <ExecutiveSection
+                  title="Executive Committee"
+                  eyebrow="Executives"
+                  members={executives}
+                  selectedYear={selectedYear}
+                  onSelectMember={setSelectedMember}
+                />
+              )}
+
+              {/* 8. ASSOCIATE EXECUTIVES (Centered grid) */}
+              {associates.length > 0 && (
+                <div className="section-theme-wrapper section--dark">
+                  <ExecutiveSection
+                    title="Associate Executives"
+                    eyebrow="Support Team"
+                    members={associates}
+                    selectedYear={selectedYear}
+                    onSelectMember={setSelectedMember}
+                  />
+                </div>
+              )}
+            </>
           )}
 
-          {/* 3. STUDENT LEADERSHIP (President, VP, etc. - Styled on Dark BG) */}
-          {mainLeadership.length > 0 && (
-            <div className="section-theme-wrapper section--dark">
-              <LeadershipSection
-                title="Student Leadership"
-                eyebrow="Executive Officers"
-                members={mainLeadership}
-                selectedYear={selectedYear}
-                onSelectMember={setSelectedMember}
-              />
-            </div>
-          )}
-
-          {/* 4. DOMAIN & VERTICAL LEADS (Tech, Ops, PR Leads - Directly below Leadership on Dark BG) */}
-          {verticalLeads.length > 0 && (
-            <div className="section-theme-wrapper section--dark section-border-top">
-              <LeadershipSection
-                title="Domain &amp; Vertical Leads"
-                eyebrow="Functional Directors"
-                members={verticalLeads}
-                selectedYear={selectedYear}
-                onSelectMember={setSelectedMember}
-              />
-            </div>
-          )}
-
-          {/* 5. CORE TEAM (Domain Leadership & Core Leads on Warm Cream BG) */}
-          {core.length > 0 && (
-            <CoreTeamSection
-              members={core}
-              selectedYear={selectedYear}
-              onSelectMember={setSelectedMember}
-            />
-          )}
-
-          {/* 6. HOW ABHYUDAYA WORKS (Interactive Organizational Flow) */}
-          {(mainLeadership.length > 0 || core.length > 0) && (
-            <OrganizationStructure
-              leadership={mainLeadership}
-              core={core}
-            />
-          )}
-
-          {/* 7. EXECUTIVE COMMITTEE */}
-          {executives.length > 0 && (
-            <ExecutiveSection
-              title="Executive Committee"
-              eyebrow="Executives"
-              members={executives}
-              selectedYear={selectedYear}
-              onSelectMember={setSelectedMember}
-            />
-          )}
-
-          {/* 8. ASSOCIATE EXECUTIVES (Centered grid) */}
-          {associates.length > 0 && (
-            <div className="section-theme-wrapper section--dark">
-              <ExecutiveSection
-                title="Associate Executives"
-                eyebrow="Support Team"
-                members={associates}
-                selectedYear={selectedYear}
-                onSelectMember={setSelectedMember}
-              />
-            </div>
-          )}
-
-          {/* 9. ABHYUDAYA DEVELOPERS — Only visible under AY 2026 */}
-          {webDev.length > 0 && selectedYear === '2026' && (
+          {/* 9. ABHYUDAYA DEVELOPERS — Permanent, common section across ALL academic years */}
+          {commonDevelopers.length > 0 && (
             <WebDevTeamSection
-              members={webDev}
+              members={commonDevelopers}
               onSelectMember={setSelectedMember}
             />
           )}

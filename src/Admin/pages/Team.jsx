@@ -10,7 +10,9 @@ import {
   EXECUTIVE_DEPARTMENTS,
   ROLE_PRESETS,
   isValidUrl,
+  ABHYUDAYA_DEV_COMMON_YEAR,
   ABHYUDAYA_DEV_FIXED_YEAR,
+  isAbhyudayaDeveloper,
 } from "../../components/team/teamUtils";
 import {
   getTeamMembers,
@@ -193,9 +195,12 @@ export default function Team() {
     };
   }, [toast]);
 
-  // Year-filtered members
+  // Year-filtered members: includes year-specific roster PLUS permanent common Abhyudaya Developers
   const yearMembers = useMemo(() => {
     return members.filter((m) => {
+      if (isAbhyudayaDeveloper(m)) {
+        return true; // Abhyudaya Developers are permanent and common across all academic years
+      }
       const memberYear = String(
         m.year ?? m.batch ?? m.session ?? m.academicYear ?? m.teamYear ?? "2026"
       ).trim();
@@ -203,16 +208,14 @@ export default function Team() {
     });
   }, [members, selectedYear]);
 
-  // Dynamic Statistics scoped to the currently selected year
+  // Dynamic Statistics scoped to the currently selected year (including common developers)
   const stats = useMemo(() => {
     const total = yearMembers.length;
     const activeCount = yearMembers.filter((m) => m.active !== false).length;
     const leadershipCount = yearMembers.filter((m) => m.level === LEVELS.LEADERSHIP).length;
     const coreCount = yearMembers.filter((m) => m.level === LEVELS.CORE).length;
     const execCount = yearMembers.filter((m) => m.level === LEVELS.EXECUTIVE).length;
-    const webDevCount = yearMembers.filter(
-      (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
-    ).length;
+    const webDevCount = yearMembers.filter(isAbhyudayaDeveloper).length;
     const facultyCount = yearMembers.filter((m) => m.level === LEVELS.FACULTY_ADVISOR).length;
     return { total, activeCount, leadershipCount, coreCount, execCount, webDevCount, facultyCount };
   }, [yearMembers]);
@@ -278,7 +281,7 @@ export default function Team() {
       if (activeTab === "CORE") return m.level === LEVELS.CORE;
       if (activeTab === "EXECUTIVE") return m.level === LEVELS.EXECUTIVE;
       if (activeTab === "WEB_DEV") {
-        return m.level === LEVELS.WEB_DEV || m.department === "Web Development";
+        return isAbhyudayaDeveloper(m);
       }
       if (activeTab === "FACULTY") return m.level === LEVELS.FACULTY_ADVISOR;
 
@@ -367,13 +370,11 @@ export default function Team() {
   // Bulk Move Year Handler with Strict Abhyudaya Developers Protection
   const handleOpenMoveYearModal = () => {
     const selectedMembers = yearMembers.filter((m) => selectedMemberIds.includes(m.id));
-    const allAreDevs = selectedMembers.every(
-      (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
-    );
+    const allAreDevs = selectedMembers.every(isAbhyudayaDeveloper);
 
     if (allAreDevs) {
       toast.error(
-        `Abhyudaya Developers profiles are permanently locked to Academic Year ${ABHYUDAYA_DEV_FIXED_YEAR} and cannot be moved to another academic year.`
+        "Abhyudaya Developers profiles are permanent and common across all academic years and cannot be moved or assigned to a specific year."
       );
       return;
     }
@@ -385,16 +386,12 @@ export default function Team() {
 
   const handleConfirmMoveYear = async () => {
     const selectedMembers = yearMembers.filter((m) => selectedMemberIds.includes(m.id));
-    const eligibleMembers = selectedMembers.filter(
-      (m) => m.level !== LEVELS.WEB_DEV && m.department !== "Web Development"
-    );
-    const devMembers = selectedMembers.filter(
-      (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
-    );
+    const eligibleMembers = selectedMembers.filter((m) => !isAbhyudayaDeveloper(m));
+    const devMembers = selectedMembers.filter(isAbhyudayaDeveloper);
 
     if (eligibleMembers.length === 0) {
       toast.error(
-        `Abhyudaya Developers profiles are permanently locked to Academic Year ${ABHYUDAYA_DEV_FIXED_YEAR} and cannot be moved.`
+        "Abhyudaya Developers profiles are permanent and common across all academic years and cannot be moved."
       );
       setShowMoveYearModal(false);
       return;
@@ -419,7 +416,7 @@ export default function Team() {
 
       if (devMembers.length > 0) {
         toast.info(
-          `Moved ${eligibleMembers.length} member(s) to AY ${targetMoveYear}. Note: ${devMembers.length} Abhyudaya Developer profile(s) were protected and kept in AY ${ABHYUDAYA_DEV_FIXED_YEAR}.`
+          `Moved ${eligibleMembers.length} member(s) to AY ${targetMoveYear}. Note: ${devMembers.length} Abhyudaya Developer profile(s) were protected as common across all years.`
         );
       } else {
         toast.success(`Successfully moved ${eligibleMembers.length} member(s) to AY ${targetMoveYear}.`);
@@ -532,16 +529,19 @@ export default function Team() {
       const matchingPreset = ROLE_PRESETS.find((p) => p.value === member.role);
       setSelectedPreset(matchingPreset ? matchingPreset.value : "custom");
 
-      const memberYear = String(
-        member.year ?? member.batch ?? member.session ?? member.academicYear ?? selectedYear
-      ).trim();
+      const isDev = isAbhyudayaDeveloper(member);
+      const memberYear = isDev
+        ? ABHYUDAYA_DEV_COMMON_YEAR
+        : String(
+            member.year ?? member.batch ?? member.session ?? member.academicYear ?? selectedYear
+          ).trim();
 
       setFormData({
         name: member.name || "",
         role: member.role || "",
-        level: member.level || LEVELS.EXECUTIVE,
-        department: member.department || "Operations",
-        category: member.category || "Domain Leads",
+        level: isDev ? LEVELS.WEB_DEV : (member.level || LEVELS.EXECUTIVE),
+        department: isDev ? "Web Development" : (member.department || "Operations"),
+        category: isDev ? "Abhyudaya Developers" : (member.category || "Domain Leads"),
         year: memberYear,
         linkedin: member.linkedin || "",
         github: member.github || "",
@@ -645,6 +645,7 @@ export default function Team() {
 
     const preset = ROLE_PRESETS.find((p) => p.value === presetValue);
     if (preset) {
+      const isDevPreset = preset.level === LEVELS.WEB_DEV;
       setFormData((prev) => ({
         ...prev,
         role: preset.value,
@@ -652,8 +653,12 @@ export default function Team() {
         department: preset.department,
         category: preset.category,
         github: preset.level === LEVELS.FACULTY_ADVISOR ? "" : prev.github,
-        // Auto-lock year to 2026 for Abhyudaya Developers preset roles
-        year: preset.level === LEVELS.WEB_DEV ? ABHYUDAYA_DEV_FIXED_YEAR : prev.year,
+        // Common year across all academic years for Abhyudaya Developers
+        year: isDevPreset
+          ? ABHYUDAYA_DEV_COMMON_YEAR
+          : prev.year === ABHYUDAYA_DEV_COMMON_YEAR
+          ? selectedYear
+          : prev.year,
       }));
     }
   };
@@ -667,9 +672,15 @@ export default function Team() {
         ...prev,
         [name]: type === "checkbox" ? checked : value,
       };
-      // Auto-lock year to 2026 when level is switched to Abhyudaya Developers
-      if (name === "level" && value === LEVELS.WEB_DEV) {
-        updated.year = ABHYUDAYA_DEV_FIXED_YEAR;
+      // Auto-set common year when level is switched to Abhyudaya Developers
+      if (name === "level") {
+        if (value === LEVELS.WEB_DEV) {
+          updated.year = ABHYUDAYA_DEV_COMMON_YEAR;
+          updated.department = "Web Development";
+          updated.category = "Abhyudaya Developers";
+        } else if (prev.level === LEVELS.WEB_DEV) {
+          updated.year = selectedYear;
+        }
       }
       return updated;
     });
@@ -758,21 +769,48 @@ export default function Team() {
     }
 
     setSaving(true);
-    // Abhyudaya Developers: always lock year to 2026 regardless of what the form reports
-    const targetYear = formData.level === LEVELS.WEB_DEV
-      ? ABHYUDAYA_DEV_FIXED_YEAR
+    // Abhyudaya Developers: permanent and common across all academic years
+    const isDev =
+      formData.level === LEVELS.WEB_DEV ||
+      formData.department === "Web Development" ||
+      formData.category === "Abhyudaya Developers";
+
+    const targetYear = isDev
+      ? ABHYUDAYA_DEV_COMMON_YEAR
       : String(formData.year || selectedYear).trim();
+
+    const payload = {
+      ...formData,
+      year: targetYear,
+      ...(isDev
+        ? {
+            level: LEVELS.WEB_DEV,
+            department: "Web Development",
+            category: "Abhyudaya Developers",
+            batch: "common",
+          }
+        : {}),
+    };
+
     try {
       if (editingMember) {
-        await updateTeamMember(editingMember.id, { ...formData, year: targetYear }, selectedFile);
-        toast.success(`Updated "${formData.name}" for year ${targetYear} successfully!`);
+        await updateTeamMember(editingMember.id, payload, selectedFile);
+        toast.success(
+          isDev
+            ? `Updated developer profile "${formData.name}" (Common across all academic years) successfully!`
+            : `Updated "${formData.name}" for year ${targetYear} successfully!`
+        );
       } else {
-        await addTeamMember({ ...formData, year: targetYear }, selectedFile);
-        toast.success(`Added "${formData.name}" to team ${targetYear} successfully!`);
+        await addTeamMember(payload, selectedFile);
+        toast.success(
+          isDev
+            ? `Added developer profile "${formData.name}" (Common across all academic years) successfully!`
+            : `Added "${formData.name}" to team ${targetYear} successfully!`
+        );
       }
       setShowDrawer(false);
       resetForm();
-      if (targetYear !== selectedYear) {
+      if (!isDev && targetYear !== selectedYear) {
         setSelectedYear(targetYear);
       }
       await loadData();
@@ -844,8 +882,11 @@ export default function Team() {
   };
 
   const isFacultyRole = formData.level === LEVELS.FACULTY_ADVISOR;
-  /** Abhyudaya Developers members are permanently locked to AY 2026. */
-  const isAbhyudayaDev = formData.level === LEVELS.WEB_DEV;
+  /** Abhyudaya Developers members are permanent and common across all academic years. */
+  const isAbhyudayaDev =
+    formData.level === LEVELS.WEB_DEV ||
+    formData.department === "Web Development" ||
+    formData.category === "Abhyudaya Developers";
 
   // Helper for tier color badges
   const getTierBadgeClass = (level) => {
@@ -1936,10 +1977,10 @@ export default function Team() {
                           Academic / Team Year <span className="team-form-required">*</span>
                         </label>
                         {isAbhyudayaDev ? (
-                          /* Abhyudaya Developers are permanently locked to AY 2026 */
+                          /* Abhyudaya Developers are permanent and common across all academic years */
                           <div className="team-form-locked-field">
-                            <span className="team-form-locked-value">2026 (Current)</span>
-                            <span className="team-form-locked-badge">Protected</span>
+                            <span className="team-form-locked-value">Common Across All Years</span>
+                            <span className="team-form-locked-badge">Permanent</span>
                           </div>
                         ) : (
                           <select
@@ -1957,7 +1998,7 @@ export default function Team() {
                         )}
                         <span className="team-form-hint">
                           {isAbhyudayaDev
-                            ? "Abhyudaya Developers are permanently associated with Academic Year 2026."
+                            ? "Abhyudaya Developers are permanent and common across all academic years."
                             : `Profile will be published under the ${formData.year} roster.`}
                         </span>
                       </div>
@@ -2325,11 +2366,9 @@ export default function Team() {
                   const selectedMembers = yearMembers.filter((m) =>
                     selectedMemberIds.includes(m.id)
                   );
-                  const devMembers = selectedMembers.filter(
-                    (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
-                  );
+                  const devMembers = selectedMembers.filter(isAbhyudayaDeveloper);
                   const eligibleMembers = selectedMembers.filter(
-                    (m) => m.level !== LEVELS.WEB_DEV && m.department !== "Web Development"
+                    (m) => !isAbhyudayaDeveloper(m)
                   );
 
                   return (
@@ -2366,8 +2405,7 @@ export default function Team() {
                             <strong>Abhyudaya Developers Protection Notice:</strong>
                             <br />
                             {devMembers.length} selected member(s) ({devMembers.map((d) => d.name).join(", ")}) belong to
-                            Abhyudaya Developers. They are permanently locked to Academic Year {ABHYUDAYA_DEV_FIXED_YEAR} and
-                            will be preserved in 2026. Only the other {eligibleMembers.length} member(s) will be moved.
+                            Abhyudaya Developers. They are permanently common across all academic years and will remain protected. Only the other {eligibleMembers.length} member(s) will be moved.
                           </div>
                         </div>
                       )}

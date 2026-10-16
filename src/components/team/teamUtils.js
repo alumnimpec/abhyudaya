@@ -30,12 +30,52 @@ export const LEVEL_LABELS = {
 };
 
 /**
- * ABHYUDAYA DEVELOPERS — Protected Section Constants
- * The Abhyudaya Developers section is permanently locked to AY 2026.
- * These constants must be used by the service layer to enforce restrictions.
+ * ABHYUDAYA DEVELOPERS — Protected Common Section Constants
+ * The Abhyudaya Developers section is permanent and common across ALL academic years.
+ * Developer profiles are shared, year-agnostic, and must never be bound to a specific year.
  */
-export const ABHYUDAYA_DEV_FIXED_YEAR = "2026";
+export const ABHYUDAYA_DEV_COMMON_YEAR = "common";
+export const ABHYUDAYA_DEV_FIXED_YEAR = "common"; // Backward compatibility alias
 export const ABHYUDAYA_DEV_SECTION_ID = "abhyudaya-developers";
+
+/**
+ * Checks whether a given member belongs to the permanent Abhyudaya Developers team.
+ * Safe compatibility helper recognizing level, department, category, role, or common year.
+ */
+export function isAbhyudayaDeveloper(member) {
+  if (!member) return false;
+  const level = String(member.level || "").trim().toLowerCase();
+  const lowerCat = String(member.category || "").toLowerCase();
+  const lowerDept = String(member.department || "").toLowerCase();
+  const lowerRole = String(member.role || "").toLowerCase();
+  const memberYear = String(member.year ?? member.batch ?? "").trim().toLowerCase();
+
+  return (
+    level === "web-dev" ||
+    lowerDept === "web development" ||
+    lowerDept === "web dev" ||
+    lowerCat.includes("web dev") ||
+    lowerCat.includes("web development") ||
+    lowerCat.includes("abhyudaya developer") ||
+    lowerRole.includes("web developer") ||
+    lowerRole.includes("frontend developer") ||
+    lowerRole.includes("full stack developer") ||
+    memberYear === "common"
+  );
+}
+
+/**
+ * Deduplicates team member profiles by ID or Name+Role so each person appears only once.
+ */
+export function deduplicateMembers(members = []) {
+  const seen = new Set();
+  return members.filter((m) => {
+    const key = m.id || `${(m.name || "").trim().toLowerCase()}-${(m.role || "").trim().toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 // Canonical department labels used consistently by Admin + Public.
 export const DEPARTMENT_OPTIONS = [
@@ -195,23 +235,16 @@ export function normalizeMember(member, index = 0) {
   const hasExplicitLevel = VALID_LEVELS.includes(member.level);
 
   let level = hasExplicitLevel ? member.level : LEVELS.EXECUTIVE;
+  const isDev = isAbhyudayaDeveloper(member);
 
-  // If level or category or department indicates Web Development / Abhyudaya Developers, lock to WEB_DEV
-  if (
-    member.level === LEVELS.WEB_DEV ||
-    lowerCategory.includes("web dev") ||
-    lowerCategory.includes("web development") ||
-    lowerCategory.includes("abhyudaya developer") ||
-    explicitDept.toLowerCase() === "web development" ||
-    explicitDept.toLowerCase() === "web dev"
-  ) {
+  if (isDev) {
     level = LEVELS.WEB_DEV;
   }
 
   let department = explicitDept;
 
   // Legacy inference — only runs when the document has no controlled `level`.
-  if (!hasExplicitLevel && level !== LEVELS.WEB_DEV) {
+  if (!hasExplicitLevel && !isDev) {
     if (
       lowerRole.includes("faculty") ||
       lowerRole.includes("advisor") ||
@@ -240,13 +273,13 @@ export function normalizeMember(member, index = 0) {
   }
 
   // Department inference — only runs when no trusted explicit department is set.
-  if (!hasExplicitDept) {
-    if (level === LEVELS.FACULTY_ADVISOR) {
+  if (!hasExplicitDept || isDev) {
+    if (isDev) {
+      department = "Web Development";
+    } else if (level === LEVELS.FACULTY_ADVISOR) {
       department = "Faculty Advisory";
     } else if (level === LEVELS.LEADERSHIP) {
       department = "Leadership";
-    } else if (level === LEVELS.WEB_DEV) {
-      department = "Web Development";
     } else if (level === LEVELS.CORE || level === LEVELS.EXECUTIVE) {
       if (lowerRole.includes("operation") || lowerRole.includes("ops")) {
         department = "Operations";
@@ -276,24 +309,33 @@ export function normalizeMember(member, index = 0) {
   // remain visible on the public site.
   const active = member.active === false ? false : true;
 
+  // Year: Abhyudaya Developers are permanent and common across all years
+  const assignedYear = isDev
+    ? ABHYUDAYA_DEV_COMMON_YEAR
+    : String(member.year ?? member.batch ?? member.session ?? member.academicYear ?? member.teamYear ?? "2026").trim();
+
   return {
     id: member.id || `member-${member.name}-${index}`,
     name: member.name || "Abhyudaya Member",
-    role: role || "Team Member",
+    role: role || (isDev ? "Web Developer" : "Team Member"),
     department: department || "Operations",
     level,
     image: member.image || "",
     linkedin: (member.linkedin || "").trim(),
     github: (member.github || "").trim(),
+    instagram: (member.instagram || "").trim(),
+    website: (member.website || "").trim(),
     bio: member.bio || "",
+    quote: member.quote || "",
+    featured: Boolean(member.featured),
     order:
       member.order !== undefined && member.order !== null && member.order !== ""
         ? Number(member.order)
         : index + 1,
     active,
-    category: member.category || CATEGORY_BY_LEVEL[level] || "Executive Board",
-    year: member.year ?? member.batch ?? member.session ?? member.academicYear ?? member.teamYear ?? "2026",
-    batch: member.batch ?? member.year ?? member.session ?? member.academicYear ?? member.teamYear ?? "2026",
+    category: isDev ? "Abhyudaya Developers" : (member.category || CATEGORY_BY_LEVEL[level] || "Executive Board"),
+    year: assignedYear,
+    batch: assignedYear,
   };
 }
 
@@ -316,27 +358,19 @@ export function groupTeamMembers(members = []) {
     .filter((m) => m.level === LEVELS.LEADERSHIP)
     .sort(byOrder);
   const core = normalized
-    .filter((m) => m.level === LEVELS.CORE && m.level !== LEVELS.WEB_DEV)
+    .filter((m) => m.level === LEVELS.CORE && !isAbhyudayaDeveloper(m))
     .sort(byOrder);
   const executives = normalized
     .filter(
       (m) =>
         m.level === LEVELS.EXECUTIVE &&
-        m.level !== LEVELS.WEB_DEV &&
-        m.department !== "Web Development" &&
-        !(m.category || "").toLowerCase().includes("web dev")
+        !isAbhyudayaDeveloper(m)
     )
     .sort(byOrder);
-  const webDev = normalized
-    .filter(
-      (m) =>
-        m.level === LEVELS.WEB_DEV ||
-        m.department === "Web Development" ||
-        (m.category || "").toLowerCase().includes("web dev") ||
-        (m.category || "").toLowerCase().includes("web development") ||
-        (m.category || "").toLowerCase().includes("abhyudaya developer")
-    )
-    .sort(byOrder);
+  const webDev = deduplicateMembers(
+    normalized
+      .filter((m) => isAbhyudayaDeveloper(m))
+  ).sort(byOrder);
 
   return {
     faculty,

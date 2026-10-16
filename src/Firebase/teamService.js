@@ -16,7 +16,14 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { uploadImage } from "../Admin/pages/services/imageUpload";
-import { CATEGORY_BY_LEVEL, LEVELS, VALID_LEVELS, isValidUrl, ABHYUDAYA_DEV_FIXED_YEAR } from "../components/team/teamUtils";
+import {
+  CATEGORY_BY_LEVEL,
+  LEVELS,
+  VALID_LEVELS,
+  isValidUrl,
+  ABHYUDAYA_DEV_COMMON_YEAR,
+  isAbhyudayaDeveloper,
+} from "../components/team/teamUtils";
 
 const teamRef = collection(db, "team");
 const teamMetaYearsDoc = doc(db, "team_meta", "years");
@@ -141,11 +148,15 @@ export async function getTeamMembers(year = null) {
   }
 
   const normalized = docs.map((m) => {
-    const memberYear = String(
-      m.year ?? m.batch ?? m.session ?? m.academicYear ?? m.teamYear ?? "2026"
-    ).trim();
+    const isDev = isAbhyudayaDeveloper(m);
+    const memberYear = isDev
+      ? ABHYUDAYA_DEV_COMMON_YEAR
+      : String(m.year ?? m.batch ?? m.session ?? m.academicYear ?? m.teamYear ?? "2026").trim();
     return {
       ...m,
+      level: isDev ? LEVELS.WEB_DEV : (m.level || LEVELS.EXECUTIVE),
+      department: isDev ? "Web Development" : (m.department || "Operations"),
+      category: isDev ? "Abhyudaya Developers" : (m.category || "Executive Board"),
       year: memberYear,
       batch: memberYear,
     };
@@ -153,10 +164,21 @@ export async function getTeamMembers(year = null) {
 
   if (year) {
     const target = String(year).trim();
+    if (target === ABHYUDAYA_DEV_COMMON_YEAR || target === LEVELS.WEB_DEV) {
+      return normalized.filter((m) => isAbhyudayaDeveloper(m));
+    }
     return normalized.filter((m) => m.year === target);
   }
 
   return normalized;
+}
+
+/**
+ * Retrieves the shared Abhyudaya Developers roster common across all academic years.
+ */
+export async function getAbhyudayaDevelopers() {
+  const all = await getTeamMembers();
+  return all.filter(isAbhyudayaDeveloper);
 }
 
 /**
@@ -179,14 +201,14 @@ function validateTeamMemberData(data) {
       throw new Error("Department is required for Core, Executive, and Web Development members.");
     }
   }
-  // Abhyudaya Developers are permanently locked to AY 2026.
-  // Reject any attempt to save a WEB_DEV member under a different year.
-  if (data.level === LEVELS.WEB_DEV) {
+  // Abhyudaya Developers are permanent and common across all academic years.
+  // Reject any attempt to bind a developer profile to an individual academic year.
+  if (data.level === LEVELS.WEB_DEV || isAbhyudayaDeveloper(data)) {
     const requestedYear = String(data.year || "").trim();
-    if (requestedYear && requestedYear !== ABHYUDAYA_DEV_FIXED_YEAR) {
+    if (requestedYear && requestedYear !== ABHYUDAYA_DEV_COMMON_YEAR && requestedYear !== "2026") {
       throw new Error(
-        `Abhyudaya Developers profiles are permanently associated with Academic Year ${ABHYUDAYA_DEV_FIXED_YEAR}. ` +
-        `You cannot move them to ${requestedYear}.`
+        `Abhyudaya Developers profiles are permanent and common across all academic years. ` +
+        `They cannot be assigned to an individual academic year like "${requestedYear}".`
       );
     }
   }
@@ -214,18 +236,19 @@ function validateTeamMemberData(data) {
  * `year` and `batch` associate the profile with the academic year.
  */
 function buildTeamMemberPayload(data, image) {
-  const level = data.level || LEVELS.EXECUTIVE;
-  // Abhyudaya Developers are always locked to AY 2026 — override any submitted year value.
-  const year = level === LEVELS.WEB_DEV
-    ? ABHYUDAYA_DEV_FIXED_YEAR
-    : String(data.year || ABHYUDAYA_DEV_FIXED_YEAR).trim();
+  const isDev = data.level === LEVELS.WEB_DEV || isAbhyudayaDeveloper(data);
+  const level = isDev ? LEVELS.WEB_DEV : (data.level || LEVELS.EXECUTIVE);
+  // Abhyudaya Developers are common across all academic years
+  const year = isDev
+    ? ABHYUDAYA_DEV_COMMON_YEAR
+    : String(data.year || "2026").trim();
 
   return {
     name: String(data.name).trim(),
     role: String(data.role).trim(),
     level,
-    department: data.department ? String(data.department).trim() : "",
-    category: level === LEVELS.WEB_DEV
+    department: isDev ? "Web Development" : (data.department ? String(data.department).trim() : ""),
+    category: isDev
       ? "Abhyudaya Developers"
       : (data.category || CATEGORY_BY_LEVEL[level] || "Executive Board"),
     year,
@@ -330,21 +353,19 @@ export async function batchMoveTeamMembersYear(membersList, targetYear) {
   }
 
   // Check for any Abhyudaya Developers in the batch
-  const devMembers = membersList.filter(
-    (m) => m.level === LEVELS.WEB_DEV || m.department === "Web Development"
-  );
+  const devMembers = membersList.filter(isAbhyudayaDeveloper);
 
-  if (devMembers.length > 0 && cleanTargetYear !== ABHYUDAYA_DEV_FIXED_YEAR) {
+  if (devMembers.length > 0) {
     const devNames = devMembers.map((m) => m.name).join(", ");
     throw new Error(
-      `Abhyudaya Developers profiles (${devNames}) are permanently locked to Academic Year ${ABHYUDAYA_DEV_FIXED_YEAR} and cannot be moved to ${cleanTargetYear}.`
+      `Abhyudaya Developers profiles (${devNames}) are permanent across all academic years and cannot be assigned or moved to academic year ${cleanTargetYear}.`
     );
   }
 
   const batch = writeBatch(db);
   membersList.forEach((m) => {
-    // Skip if somehow WEB_DEV and same year
-    if (m.level === LEVELS.WEB_DEV && cleanTargetYear === ABHYUDAYA_DEV_FIXED_YEAR) {
+    // Skip Abhyudaya Developers as they are permanent across all years
+    if (isAbhyudayaDeveloper(m)) {
       return;
     }
     const memberRef = doc(db, "team", m.id);

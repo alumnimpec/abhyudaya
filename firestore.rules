@@ -254,29 +254,34 @@ service cloud.firestore {
 
     // Helper: a document is a protected Abhyudaya Developers profile.
     function isAbhyudayaDev(data) {
-      return data.get('level', '') == 'web-dev';
+      return data.get('level', '') == 'web-dev' || data.get('department', '') == 'Web Development';
     }
 
     match /team/{memberId} {
       allow read: if true;
 
-      // Create: if level is web-dev, year must be "2026".
+      // Create: if level is web-dev, year must be common or 2026 (cannot assign to a specific year), category must be Abhyudaya Developers.
       allow create: if isAdmin(['super_admin'])
         && (
           !isAbhyudayaDev(request.resource.data)
-          || request.resource.data.get('year', '') == '2026'
+          || (
+            request.resource.data.get('year', '') in ['common', '2026']
+            && request.resource.data.get('category', '') == 'Abhyudaya Developers'
+            && request.resource.data.get('level', '') == 'web-dev'
+          )
         );
 
-      // Update: cannot change level away from web-dev, and year must stay "2026".
+      // Update: Abhyudaya Developers cannot be moved to a specific year or reassigned away from web-dev / Abhyudaya Developers.
       allow update: if isAdmin(['super_admin'])
         && (
-          // Non-WEB_DEV member: allow any update
+          // Non-WEB_DEV member: allow standard super_admin updates
           (!isAbhyudayaDev(resource.data) && !isAbhyudayaDev(request.resource.data))
-          // WEB_DEV member: year must stay 2026 and level must stay web-dev
+          // WEB_DEV member: year must stay common/2026, category must stay Abhyudaya Developers, level must stay web-dev
           || (
             isAbhyudayaDev(resource.data)
-            && request.resource.data.get('year', '') == '2026'
+            && request.resource.data.get('year', '') in ['common', '2026']
             && request.resource.data.get('level', '') == 'web-dev'
+            && request.resource.data.get('category', '') == 'Abhyudaya Developers'
           )
         );
 
