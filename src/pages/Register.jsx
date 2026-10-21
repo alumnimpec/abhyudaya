@@ -27,8 +27,19 @@ function formatDate(dateStr) {
 function getRegistrationStatus(event, currentCount) {
   const now = new Date();
 
+  if (event.status && event.status !== "Published") {
+    return { status: "CLOSED", label: "Registrations Closed", color: "#ef4444" };
+  }
+
   if (event.registrationOpen !== true) {
     return { status: "CLOSED", label: "Registrations Closed", color: "#ef4444" };
+  }
+
+  if (event.registrationStartDate) {
+    const start = new Date(event.registrationStartDate);
+    if (!isNaN(start.getTime()) && now < start) {
+      return { status: "NOT_STARTED", label: "Registration Opens Soon", color: "#64748b" };
+    }
   }
 
   if (event.registrationDeadline) {
@@ -100,9 +111,12 @@ export default function Register() {
   const [form, setForm] = useState({
     name: "",
     email: "",
+    collegeEmail: "",
+    rollNumber: "",
     phone: "",
     branch: "",
     semester: "",
+    customAnswers: {},
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -160,6 +174,7 @@ export default function Register() {
   );
 
   const canRegister = regStatus?.status === "OPEN" || regStatus?.status === "CLOSING_SOON";
+  const ff = event?.formFields || {};
 
   const isPaidEvent = Boolean(event?.isPaid);
   const isFreeEvent = !isPaidEvent;
@@ -168,13 +183,43 @@ export default function Register() {
 
   const validate = () => {
     const errs = {};
+    const ff = event?.formFields || {};
+
     if (!form.name.trim()) errs.name = "Name is required.";
     if (!form.email.trim()) errs.email = "Email is required.";
     else if (!EMAIL_REGEX.test(form.email.trim())) errs.email = "Invalid email format.";
-    if (!form.phone.trim()) errs.phone = "Phone number is required.";
-    else if (!PHONE_REGEX.test(form.phone.trim())) errs.phone = "Invalid phone number.";
-    if (!form.branch.trim()) errs.branch = "Branch is required.";
-    if (!form.semester.trim()) errs.semester = "Semester is required.";
+
+    if (ff.collegeEmail?.enabled !== false && ff.collegeEmail?.required) {
+      if (!form.collegeEmail.trim()) errs.collegeEmail = "College email is required.";
+      else if (!EMAIL_REGEX.test(form.collegeEmail.trim())) errs.collegeEmail = "Invalid college email format.";
+    }
+
+    if (ff.rollNumber?.enabled !== false && ff.rollNumber?.required) {
+      if (!form.rollNumber.trim()) errs.rollNumber = "Roll number is required.";
+    }
+
+    if (ff.phone?.enabled !== false && ff.phone?.required) {
+      if (!form.phone.trim()) errs.phone = "Phone number is required.";
+      else if (!PHONE_REGEX.test(form.phone.trim())) errs.phone = "Invalid phone number.";
+    } else if (form.phone.trim() && !PHONE_REGEX.test(form.phone.trim())) {
+      errs.phone = "Invalid phone number.";
+    }
+
+    if (ff.departmentYear?.enabled !== false && ff.departmentYear?.required) {
+      if (!form.branch.trim()) errs.branch = "Branch / Department is required.";
+      if (!form.semester.trim()) errs.semester = "Semester / Year is required.";
+    }
+
+    // Custom questions validation
+    (ff.customQuestions || []).forEach((q) => {
+      if (q.required) {
+        const ans = (form.customAnswers[q.label] || "").trim();
+        if (!ans) {
+          errs[`q_${q.id || q.label}`] = `"${q.label}" is required.`;
+        }
+      }
+    });
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -196,9 +241,14 @@ export default function Register() {
         eventTitle: event.title,
         name: form.name.trim(),
         email: form.email.trim(),
+        collegeEmail: form.collegeEmail.trim() || form.email.trim(),
+        rollNumber: form.rollNumber.trim(),
         phone: form.phone.trim(),
         branch: form.branch.trim(),
         semester: form.semester.trim(),
+        department: form.branch.trim(),
+        year: form.semester.trim(),
+        customAnswers: form.customAnswers,
         isPaid: false,
         amount: 0,
         paymentStatus: "free",
@@ -235,9 +285,14 @@ export default function Register() {
       eventTitle: event.title,
       name: form.name.trim(),
       email: form.email.trim(),
+      collegeEmail: form.collegeEmail.trim() || form.email.trim(),
+      rollNumber: form.rollNumber.trim(),
       phone: form.phone.trim(),
       branch: form.branch.trim(),
       semester: form.semester.trim(),
+      department: form.branch.trim(),
+      year: form.semester.trim(),
+      customAnswers: form.customAnswers,
       isPaid: true,
       amount: Number(event.feeAmount) || 0,
       paymentStatus: "pending",
@@ -674,53 +729,158 @@ export default function Register() {
                     )}
                   </div>
 
-                  <div className="register-field">
-                    <label className="register-label" htmlFor="reg-phone">
-                      Phone Number
-                    </label>
-                    <input
-                      id="reg-phone"
-                      type="tel"
-                      className="register-input"
-                      value={form.phone}
-                      onChange={(e) => handleChange("phone", e.target.value)}
-                      placeholder="e.g. +91 9876543210"
-                      disabled={!canRegister || isPaymentBusy}
-                    />
-                    {errors.phone && <span className="register-error">{errors.phone}</span>}
-                  </div>
-
-                  <div className="register-field-row">
+                  {ff.collegeEmail?.enabled !== false && (
                     <div className="register-field">
-                      <label className="register-label" htmlFor="reg-branch">
-                        Branch
+                      <label className="register-label" htmlFor="reg-college-email">
+                        College Email {ff.collegeEmail?.required && <span className="register-required">*</span>}
                       </label>
                       <input
-                        id="reg-branch"
-                        type="text"
+                        id="reg-college-email"
+                        type="email"
                         className="register-input"
-                        value={form.branch}
-                        onChange={(e) => handleChange("branch", e.target.value)}
-                        placeholder="e.g. CSE"
+                        value={form.collegeEmail}
+                        onChange={(e) => handleChange("collegeEmail", e.target.value)}
+                        placeholder="your.roll@college.edu"
                         disabled={!canRegister || isPaymentBusy}
                       />
+                      {errors.collegeEmail && <span className="register-error">{errors.collegeEmail}</span>}
                     </div>
+                  )}
 
+                  {ff.rollNumber?.enabled !== false && (
                     <div className="register-field">
-                      <label className="register-label" htmlFor="reg-semester">
-                        Semester
+                      <label className="register-label" htmlFor="reg-roll">
+                        Roll / Student ID {ff.rollNumber?.required && <span className="register-required">*</span>}
                       </label>
                       <input
-                        id="reg-semester"
+                        id="reg-roll"
                         type="text"
                         className="register-input"
-                        value={form.semester}
-                        onChange={(e) => handleChange("semester", e.target.value)}
-                        placeholder="e.g. 4"
+                        value={form.rollNumber}
+                        onChange={(e) => handleChange("rollNumber", e.target.value)}
+                        placeholder="e.g. 21BCE1001"
                         disabled={!canRegister || isPaymentBusy}
                       />
+                      {errors.rollNumber && <span className="register-error">{errors.rollNumber}</span>}
                     </div>
-                  </div>
+                  )}
+
+                  {ff.phone?.enabled !== false && (
+                    <div className="register-field">
+                      <label className="register-label" htmlFor="reg-phone">
+                        Phone Number {ff.phone?.required && <span className="register-required">*</span>}
+                      </label>
+                      <input
+                        id="reg-phone"
+                        type="tel"
+                        className="register-input"
+                        value={form.phone}
+                        onChange={(e) => handleChange("phone", e.target.value)}
+                        placeholder="e.g. +91 9876543210"
+                        disabled={!canRegister || isPaymentBusy}
+                      />
+                      {errors.phone && <span className="register-error">{errors.phone}</span>}
+                    </div>
+                  )}
+
+                  {ff.departmentYear?.enabled !== false && (
+                    <div className="register-field-row">
+                      <div className="register-field">
+                        <label className="register-label" htmlFor="reg-branch">
+                          Department / Branch {ff.departmentYear?.required && <span className="register-required">*</span>}
+                        </label>
+                        <input
+                          id="reg-branch"
+                          type="text"
+                          className="register-input"
+                          value={form.branch}
+                          onChange={(e) => handleChange("branch", e.target.value)}
+                          placeholder="e.g. CSE"
+                          disabled={!canRegister || isPaymentBusy}
+                        />
+                        {errors.branch && <span className="register-error">{errors.branch}</span>}
+                      </div>
+
+                      <div className="register-field">
+                        <label className="register-label" htmlFor="reg-semester">
+                          Year / Semester {ff.departmentYear?.required && <span className="register-required">*</span>}
+                        </label>
+                        <input
+                          id="reg-semester"
+                          type="text"
+                          className="register-input"
+                          value={form.semester}
+                          onChange={(e) => handleChange("semester", e.target.value)}
+                          placeholder="e.g. 3rd Year / 6th Sem"
+                          disabled={!canRegister || isPaymentBusy}
+                        />
+                        {errors.semester && <span className="register-error">{errors.semester}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {Array.isArray(ff.customQuestions) && ff.customQuestions.map((q, idx) => (
+                    <div key={q.id || idx} className="register-field">
+                      <label className="register-label">
+                        {q.label} {q.required && <span className="register-required">*</span>}
+                      </label>
+                      {q.type === "textarea" ? (
+                        <textarea
+                          className="register-input register-textarea"
+                          rows="3"
+                          value={form.customAnswers[q.label] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setForm((prev) => ({
+                              ...prev,
+                              customAnswers: { ...prev.customAnswers, [q.label]: val },
+                            }));
+                            setErrors((prev) => ({ ...prev, [`q_${q.id || q.label}`]: "" }));
+                          }}
+                          placeholder="Your answer"
+                          disabled={!canRegister || isPaymentBusy}
+                        />
+                      ) : q.type === "select" ? (
+                        <select
+                          className="register-input"
+                          value={form.customAnswers[q.label] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setForm((prev) => ({
+                              ...prev,
+                              customAnswers: { ...prev.customAnswers, [q.label]: val },
+                            }));
+                            setErrors((prev) => ({ ...prev, [`q_${q.id || q.label}`]: "" }));
+                          }}
+                          disabled={!canRegister || isPaymentBusy}
+                        >
+                          <option value="">Select an option...</option>
+                          {(q.options || []).map((opt, oIdx) => (
+                            <option key={oIdx} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          className="register-input"
+                          value={form.customAnswers[q.label] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setForm((prev) => ({
+                              ...prev,
+                              customAnswers: { ...prev.customAnswers, [q.label]: val },
+                            }));
+                            setErrors((prev) => ({ ...prev, [`q_${q.id || q.label}`]: "" }));
+                          }}
+                          placeholder="Your answer"
+                          disabled={!canRegister || isPaymentBusy}
+                        />
+                      )}
+                      {errors[`q_${q.id || q.label}`] && (
+                        <span className="register-error">{errors[`q_${q.id || q.label}`]}</span>
+                      )}
+                    </div>
+                  ))}
 
                   {submitError && <div className="register-submit-error">{submitError}</div>}
 

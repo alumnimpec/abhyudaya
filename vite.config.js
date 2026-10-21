@@ -6,11 +6,106 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function localApiPlugin() {
+  return {
+    name: "local-api-middleware",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const urlStr = req.url || "/";
+        const pathname = urlStr.split("?")[0];
+        if (pathname.startsWith("/api/")) {
+          try {
+            const { dispatch, findHandler } = await import("./server/router.js");
+            if (findHandler(pathname)) {
+              const chunks = [];
+              req.on("data", (chunk) => {
+                chunks.push(chunk);
+              });
+              req.on("end", async () => {
+                const rawBody = Buffer.concat(chunks).toString("utf-8");
+                let body = {};
+                if (rawBody) {
+                  try {
+                    body = JSON.parse(rawBody);
+                  } catch {
+                    body = {};
+                  }
+                }
+                const parsedUrl = new URL(urlStr, "http://localhost");
+                const query = {};
+                for (const [k, v] of parsedUrl.searchParams.entries()) {
+                  query[k] = v;
+                }
+                const reqWrapper = {
+                  method: req.method,
+                  url: req.url,
+                  headers: req.headers,
+                  query,
+                  body,
+                  socket: { remoteAddress: req.socket?.remoteAddress || "127.0.0.1" },
+                };
+                let headersSent = false;
+                const resHeaders = { "access-control-allow-origin": "*" };
+                const resWrapper = {
+                  _statusCode: 200,
+                  get headersSent() {
+                    return headersSent;
+                  },
+                  status(code) {
+                    this._statusCode = code;
+                    return this;
+                  },
+                  setHeader(k, v) {
+                    resHeaders[k.toLowerCase()] = v;
+                    return this;
+                  },
+                  json(payload) {
+                    const str = JSON.stringify(payload);
+                    if (!headersSent) {
+                      headersSent = true;
+                      resHeaders["content-type"] = "application/json";
+                      resHeaders["content-length"] = Buffer.byteLength(str);
+                      res.writeHead(this._statusCode, resHeaders);
+                    }
+                    res.end(str);
+                  },
+                  send(payload) {
+                    const str = typeof payload === "string" ? payload : JSON.stringify(payload);
+                    if (!headersSent) {
+                      headersSent = true;
+                      resHeaders["content-length"] = Buffer.byteLength(str);
+                      res.writeHead(this._statusCode, resHeaders);
+                    }
+                    res.end(str);
+                  },
+                  end(payload) {
+                    if (!headersSent) {
+                      headersSent = true;
+                      res.writeHead(this._statusCode, resHeaders);
+                    }
+                    res.end(payload);
+                  },
+                };
+                await dispatch(reqWrapper, resWrapper, pathname);
+              });
+              return;
+            }
+          } catch (err) {
+            console.error("Local API middleware error:", err);
+          }
+        }
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: "/",
   plugins: [
     react(),
     tailwindcss(),
+    localApiPlugin(),
   ],
 
   // ── Local development proxy ────────────────────────────────────

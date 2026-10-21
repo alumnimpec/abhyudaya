@@ -381,14 +381,18 @@ export default function App() {
               }
             />
 
-            {/* Registrations */}
+            {/* Event Registrations */}
             <Route
               path="/admin/registrations"
               element={
-                <ProtectedRoute allowedRoles={["super_admin", "event_admin"]}>
+                <ProtectedRoute allowedRoles={["super_admin"]}>
                   <AdminRegistrations />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/admin/event-registrations"
+              element={<Navigate to="/admin/registrations" replace />}
             />
 
             {/* Registration Outreach */}

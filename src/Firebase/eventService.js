@@ -112,14 +112,25 @@ function formatEventDoc(snapshotDoc) {
     ctaLink: data.ctaLink || "",
     featured: Boolean(data.featured),
     status: data.status || "Published",
-    order: Number(data.order) || 99,
     venue: data.venue || "",
     location: data.location || "",
+    meetingLink: data.meetingLink || "",
+    coordinatorName: data.coordinatorName || data.coordinator || "",
+    coordinatorEmail: data.coordinatorEmail || "",
+    coordinatorPhone: data.coordinatorPhone || "",
     eventStartDate: data.eventStartDate || "",
     eventEndDate: data.eventEndDate || "",
+    registrationStartDate: data.registrationStartDate || data.registrationStart || "",
     registrationDeadline: data.registrationDeadline || "",
     registrationOpen: data.registrationOpen === true,
     maxRegistrations: data.maxRegistrations ? Number(data.maxRegistrations) : null,
+    formFields: data.formFields || {
+      collegeEmail: { enabled: true, required: false },
+      rollNumber: { enabled: true, required: false },
+      departmentYear: { enabled: true, required: false },
+      phone: { enabled: true, required: true },
+      customQuestions: [],
+    },
     // Pricing / Registration Type (backward-compatible safe defaults)
     isPaid: Boolean(data.isPaid),
     feeAmount: Number.isFinite(Number(data.feeAmount)) ? Number(data.feeAmount) : 0,
@@ -327,11 +338,23 @@ export async function createEvent(eventData, imageFile = null) {
     order: Number(eventData.order) || 99,
     venue: (eventData.venue || "").trim(),
     location: (eventData.location || "").trim(),
+    meetingLink: (eventData.meetingLink || "").trim(),
+    coordinatorName: (eventData.coordinatorName || eventData.coordinator || "").trim(),
+    coordinatorEmail: (eventData.coordinatorEmail || "").trim(),
+    coordinatorPhone: (eventData.coordinatorPhone || "").trim(),
     eventStartDate: eventData.eventStartDate || "",
     eventEndDate: eventData.eventEndDate || "",
+    registrationStartDate: eventData.registrationStartDate || "",
     registrationDeadline: eventData.registrationDeadline || "",
     registrationOpen: Boolean(eventData.registrationOpen),
     maxRegistrations: eventData.maxRegistrations ? Number(eventData.maxRegistrations) : null,
+    formFields: eventData.formFields || {
+      collegeEmail: { enabled: true, required: false },
+      rollNumber: { enabled: true, required: false },
+      departmentYear: { enabled: true, required: false },
+      phone: { enabled: true, required: true },
+      customQuestions: [],
+    },
     // Pricing / Registration Type
     isPaid: Boolean(eventData.isPaid),
     feeAmount: Number.isFinite(Number(eventData.feeAmount)) ? Number(eventData.feeAmount) : 0,
@@ -387,11 +410,17 @@ export async function updateEvent(id, eventData, imageFile = null) {
     order: Number(eventData.order) || 99,
     venue: (eventData.venue || "").trim(),
     location: (eventData.location || "").trim(),
+    meetingLink: (eventData.meetingLink || "").trim(),
+    coordinatorName: (eventData.coordinatorName || eventData.coordinator || "").trim(),
+    coordinatorEmail: (eventData.coordinatorEmail || "").trim(),
+    coordinatorPhone: (eventData.coordinatorPhone || "").trim(),
     eventStartDate: eventData.eventStartDate || "",
     eventEndDate: eventData.eventEndDate || "",
+    registrationStartDate: eventData.registrationStartDate || "",
     registrationDeadline: eventData.registrationDeadline || "",
     registrationOpen: Boolean(eventData.registrationOpen),
     maxRegistrations: eventData.maxRegistrations ? Number(eventData.maxRegistrations) : null,
+    ...(eventData.formFields ? { formFields: eventData.formFields } : {}),
     // Pricing / Registration Type
     isPaid: Boolean(eventData.isPaid),
     feeAmount: Number.isFinite(Number(eventData.feeAmount)) ? Number(eventData.feeAmount) : 0,
@@ -400,6 +429,22 @@ export async function updateEvent(id, eventData, imageFile = null) {
   };
 
   await updateDoc(docRef, payload);
+}
+
+export async function toggleEventRegistration(id, isOpen) {
+  const docRef = doc(db, EVENTS_COLLECTION, id);
+  await updateDoc(docRef, {
+    registrationOpen: Boolean(isOpen),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function setEventStatus(id, status) {
+  const docRef = doc(db, EVENTS_COLLECTION, id);
+  await updateDoc(docRef, {
+    status,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteEvent(id) {

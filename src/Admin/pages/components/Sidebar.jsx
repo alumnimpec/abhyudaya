@@ -87,7 +87,7 @@ export default function Sidebar() {
       { name: "Dashboard", path: "/admin/dashboard", icon: <FiGrid /> },
       { name: "Events", path: "/admin/events", icon: <FiCalendar /> },
       { name: "Certificates", path: "/admin/certificates", icon: <FiAward /> },
-      { name: "Registrations", path: "/admin/registrations", icon: <FiFileText /> },
+      { name: "Event Registrations", path: "/admin/registrations", icon: <FiFileText /> },
       { name: "Time Capsules", path: "/admin/time-capsules", icon: <FiArchive /> },
       { name: "Announcements", path: "/admin/announcements", icon: <FiBell /> },
       { name: "Students", path: "/admin/students", icon: <FiUsers /> },
@@ -148,7 +148,6 @@ export default function Sidebar() {
     [ROLES.EVENT_ADMIN]: [
       { name: "Events", path: "/admin/events", icon: <FiCalendar /> },
       { name: "Certificates", path: "/admin/certificates", icon: <FiAward /> },
-      { name: "Registrations", path: "/admin/registrations", icon: <FiFileText /> },
       { name: "Time Capsules", path: "/admin/time-capsules", icon: <FiArchive /> },
       { name: "Announcements", path: "/admin/announcements", icon: <FiBell /> },
       { name: "Students", path: "/admin/students", icon: <FiUsers /> },

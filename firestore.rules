@@ -49,13 +49,14 @@ service cloud.firestore {
     // ============================================================
     // EVENTS
     // Public: read published events only.
-    // Admins (super_admin, event_admin): read ALL + write.
+    // Super Admin: read ALL + create, edit, publish, close, delete.
+    // Regular admins (event_admin): read only.
     // ============================================================
     match /events/{eventId} {
       allow read: if isAdmin(['super_admin', 'event_admin'])
         || resource.data.status == 'Published';
 
-      allow create, update, delete: if isAdmin(['super_admin', 'event_admin']);
+      allow create, update, delete: if isAdmin(['super_admin']);
     }
 
     // ============================================================
@@ -82,16 +83,13 @@ service cloud.firestore {
     // ============================================================
     // REGISTRATIONS
     // Public submissions are validated and written through the server API using
-    // the Firebase Admin SDK. Browser clients cannot read or forge records.
+    // the Firebase Admin SDK. Browser clients cannot create or forge records directly.
+    // Only Super Admin can read participant records, update status, or delete them.
     // ============================================================
     match /registrations/{registrationId} {
       allow create: if false;
 
-      // Clients cannot update payment/confirmation fields.
-      // Only the trusted backend (Admin SDK) can set these.
-      allow update: if isAdmin(['super_admin', 'event_admin']);
-
-      allow read, delete: if isAdmin(['super_admin', 'event_admin']);
+      allow update, read, delete: if isAdmin(['super_admin']);
     }
 
     // ============================================================

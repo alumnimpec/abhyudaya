@@ -118,14 +118,30 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
   const [longDesc, setLongDesc]     = useState(initialData?.longDescription || "");
   const [venue, setVenue]           = useState(initialData?.venue || "");
   const [location, setLocation]     = useState(initialData?.location || "");
+  const [meetingLink, setMeetingLink] = useState(initialData?.meetingLink || "");
   const [organizer, setOrganizer]   = useState(initialData?.organizer || "Abhyudaya Club");
+  const [coordinatorName, setCoordinatorName] = useState(initialData?.coordinatorName || "");
+  const [coordinatorEmail, setCoordinatorEmail] = useState(initialData?.coordinatorEmail || "");
+  const [coordinatorPhone, setCoordinatorPhone] = useState(initialData?.coordinatorPhone || "");
   const [eventStartDate, setEventStartDate] = useState(initialData?.eventStartDate || "");
   const [eventEndDate, setEventEndDate]     = useState(initialData?.eventEndDate || "");
+  const [regStartDate, setRegStartDate]     = useState(initialData?.registrationStartDate || "");
   const [regDeadline, setRegDeadline]       = useState(initialData?.registrationDeadline || "");
   const [maxRegistrations, setMaxRegistrations] = useState(
     initialData?.maxRegistrations ? String(initialData.maxRegistrations) : ""
   );
   const [registrationOpen, setRegistrationOpen] = useState(Boolean(initialData?.registrationOpen));
+
+  /* ── Participant Form Fields Configuration ── */
+  const [formFields, setFormFields] = useState(
+    initialData?.formFields || {
+      collegeEmail: { enabled: true, required: false },
+      rollNumber: { enabled: true, required: false },
+      departmentYear: { enabled: true, required: false },
+      phone: { enabled: true, required: true },
+      customQuestions: [],
+    }
+  );
 
   /* ── Registration / Pricing ── */
   const [isPaid, setIsPaid] = useState(Boolean(initialData?.isPaid));
@@ -307,12 +323,18 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
       longDescription:  longDesc.trim(),
       venue:       venue.trim(),
       location:    location.trim(),
+      meetingLink: meetingLink.trim(),
       organizer:   organizer.trim(),
+      coordinatorName: coordinatorName.trim(),
+      coordinatorEmail: coordinatorEmail.trim(),
+      coordinatorPhone: coordinatorPhone.trim(),
       eventStartDate,
       eventEndDate,
+      registrationStartDate: regStartDate,
       registrationDeadline: regDeadline,
       registrationOpen,
       maxRegistrations: maxRegistrations ? Number(maxRegistrations) : null,
+      formFields,
       image:       bannerUrl,
       banner:      bannerUrl,
       thumbnail:   thumbUrl,
@@ -341,8 +363,9 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
     };
   }, [
     title, derivedSlug, category, tagline, shortDesc, longDesc,
-    venue, location, organizer, eventStartDate, eventEndDate, regDeadline, registrationOpen,
-    maxRegistrations, isPaid, feeAmount,
+    venue, location, meetingLink, organizer, coordinatorName, coordinatorEmail, coordinatorPhone,
+    eventStartDate, eventEndDate, regStartDate, regDeadline, registrationOpen,
+    maxRegistrations, formFields, isPaid, feeAmount,
     bannerUrl, thumbUrl, stats, highlights, speakers,
     badgeText, badgeIcon, ctaText, ctaLink, featured,
   ]);
@@ -484,7 +507,7 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
                   className="ae-input"
                   value={venue}
                   onChange={(e) => setVenue(e.target.value)}
-                  placeholder="Main Auditorium"
+                  placeholder="e.g. Main Auditorium, MPEC"
                 />
               </div>
 
@@ -497,40 +520,63 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
                   className="ae-input"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Kanpur, UP"
+                  placeholder="e.g. Kanpur, UP"
                 />
               </div>
 
-              {/* Start Date */}
+              {/* Online Meeting Link */}
+              <div className="ae-field ae-field-full">
+                <label className="ae-label" htmlFor="evt-meeting-link">Meeting Link (for Virtual / Hybrid events)</label>
+                <input
+                  id="evt-meeting-link"
+                  type="url"
+                  className="ae-input"
+                  value={meetingLink}
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                  placeholder="https://meet.google.com/... or Zoom Link"
+                />
+              </div>
+
+              {/* Event Dates */}
               <div className="ae-field">
-                <label className="ae-label" htmlFor="evt-start">Event Start Date</label>
+                <label className="ae-label" htmlFor="evt-start">Event Start Date & Time</label>
                 <input
                   id="evt-start"
-                  type="date"
+                  type="datetime-local"
                   className="ae-input"
                   value={eventStartDate}
                   onChange={(e) => setEventStartDate(e.target.value)}
                 />
               </div>
 
-              {/* End Date */}
               <div className="ae-field">
-                <label className="ae-label" htmlFor="evt-end">Event End Date</label>
+                <label className="ae-label" htmlFor="evt-end">Event End Date & Time</label>
                 <input
                   id="evt-end"
-                  type="date"
+                  type="datetime-local"
                   className="ae-input"
                   value={eventEndDate}
                   onChange={(e) => setEventEndDate(e.target.value)}
                 />
               </div>
 
-              {/* Registration Deadline */}
-              <div className="ae-field ae-field-full">
+              {/* Registration Window */}
+              <div className="ae-field">
+                <label className="ae-label" htmlFor="evt-reg-start">Registration Start Date & Time</label>
+                <input
+                  id="evt-reg-start"
+                  type="datetime-local"
+                  className="ae-input"
+                  value={regStartDate}
+                  onChange={(e) => setRegStartDate(e.target.value)}
+                />
+              </div>
+
+              <div className="ae-field">
                 <label className="ae-label" htmlFor="evt-reg">Registration Deadline</label>
                 <input
                   id="evt-reg"
-                  type="date"
+                  type="datetime-local"
                   className="ae-input"
                   value={regDeadline}
                   onChange={(e) => setRegDeadline(e.target.value)}
@@ -540,7 +586,7 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
               {/* Max Registrations */}
               <div className="ae-field ae-field-full">
                 <label className="ae-label" htmlFor="evt-max-reg">
-                  Max Registrations <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>(leave empty for unlimited)</span>
+                  Max Participant Limit <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>(leave empty for unlimited seats)</span>
                 </label>
                 <input
                   id="evt-max-reg"
@@ -549,7 +595,44 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
                   className="ae-input"
                   value={maxRegistrations}
                   onChange={(e) => setMaxRegistrations(e.target.value)}
-                  placeholder="e.g. 500"
+                  placeholder="e.g. 150"
+                />
+              </div>
+
+              {/* Coordinator Information */}
+              <div className="ae-field">
+                <label className="ae-label" htmlFor="evt-coord-name">Coordinator Name</label>
+                <input
+                  id="evt-coord-name"
+                  type="text"
+                  className="ae-input"
+                  value={coordinatorName}
+                  onChange={(e) => setCoordinatorName(e.target.value)}
+                  placeholder="e.g. Rahul Sharma"
+                />
+              </div>
+
+              <div className="ae-field">
+                <label className="ae-label" htmlFor="evt-coord-email">Coordinator Email</label>
+                <input
+                  id="evt-coord-email"
+                  type="email"
+                  className="ae-input"
+                  value={coordinatorEmail}
+                  onChange={(e) => setCoordinatorEmail(e.target.value)}
+                  placeholder="coordinator@abhyudayampec.in"
+                />
+              </div>
+
+              <div className="ae-field ae-field-full">
+                <label className="ae-label" htmlFor="evt-coord-phone">Coordinator Phone</label>
+                <input
+                  id="evt-coord-phone"
+                  type="tel"
+                  className="ae-input"
+                  value={coordinatorPhone}
+                  onChange={(e) => setCoordinatorPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
                 />
               </div>
             </div>
@@ -650,6 +733,270 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
                 </small>
               </div>
             )}
+          </div>
+
+          {/* ── 1c. Participant Form Fields Configuration ── */}
+          <div className="ae-card">
+            <h2 className="ae-card-title">
+              <span className="ae-card-icon">📋</span>
+              Participant Form Fields Configuration
+            </h2>
+            <p style={{ fontSize: 13, color: "#64748b", marginBottom: 18 }}>
+              Configure which details participants must submit when registering for this event, and add custom questions.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14, marginBottom: 20 }}>
+              {/* Full Name */}
+              <div style={{ padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc" }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", marginBottom: 4 }}>Full Name</div>
+                <div style={{ fontSize: 12, color: "#059669", fontWeight: 500 }}>Always Required</div>
+              </div>
+
+              {/* College Email */}
+              <div style={{ padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", marginBottom: 6 }}>College Email</div>
+                <div style={{ display: "flex", gap: 14, fontSize: 13 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={formFields?.collegeEmail?.enabled !== false}
+                      onChange={(e) =>
+                        setFormFields((prev) => ({
+                          ...prev,
+                          collegeEmail: { ...prev.collegeEmail, enabled: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>Enabled</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formFields?.collegeEmail?.required)}
+                      onChange={(e) =>
+                        setFormFields((prev) => ({
+                          ...prev,
+                          collegeEmail: { ...prev.collegeEmail, required: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>Required</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Roll Number */}
+              <div style={{ padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", marginBottom: 6 }}>Roll Number</div>
+                <div style={{ display: "flex", gap: 14, fontSize: 13 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={formFields?.rollNumber?.enabled !== false}
+                      onChange={(e) =>
+                        setFormFields((prev) => ({
+                          ...prev,
+                          rollNumber: { ...prev.rollNumber, enabled: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>Enabled</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formFields?.rollNumber?.required)}
+                      onChange={(e) =>
+                        setFormFields((prev) => ({
+                          ...prev,
+                          rollNumber: { ...prev.rollNumber, required: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>Required</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Department & Year */}
+              <div style={{ padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", marginBottom: 6 }}>Department & Year</div>
+                <div style={{ display: "flex", gap: 14, fontSize: 13 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={formFields?.departmentYear?.enabled !== false}
+                      onChange={(e) =>
+                        setFormFields((prev) => ({
+                          ...prev,
+                          departmentYear: { ...prev.departmentYear, enabled: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>Enabled</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formFields?.departmentYear?.required)}
+                      onChange={(e) =>
+                        setFormFields((prev) => ({
+                          ...prev,
+                          departmentYear: { ...prev.departmentYear, required: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>Required</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Phone Number */}
+              <div style={{ padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", marginBottom: 6 }}>Phone Number</div>
+                <div style={{ display: "flex", gap: 14, fontSize: 13 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={formFields?.phone?.enabled !== false}
+                      onChange={(e) =>
+                        setFormFields((prev) => ({
+                          ...prev,
+                          phone: { ...prev.phone, enabled: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>Enabled</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formFields?.phone?.required)}
+                      onChange={(e) =>
+                        setFormFields((prev) => ({
+                          ...prev,
+                          phone: { ...prev.phone, required: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>Required</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Questions */}
+            <div style={{ marginTop: 24, borderTop: "1px solid #e2e8f0", paddingTop: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1e293b", margin: 0 }}>
+                  Custom Questions ({formFields?.customQuestions?.length || 0})
+                </h3>
+                <button
+                  type="button"
+                  className="ae-btn-secondary"
+                  style={{ padding: "6px 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+                  onClick={() =>
+                    setFormFields((prev) => ({
+                      ...prev,
+                      customQuestions: [
+                        ...(prev.customQuestions || []),
+                        {
+                          id: `q_${Date.now()}`,
+                          label: "",
+                          type: "text",
+                          required: false,
+                          options: "",
+                        },
+                      ],
+                    }))
+                  }
+                >
+                  <FaPlus /> <span>Add Question</span>
+                </button>
+              </div>
+
+              {(formFields?.customQuestions || []).map((q, idx) => (
+                <div
+                  key={q.id || idx}
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 10,
+                    padding: 14,
+                    marginBottom: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <span style={{ fontWeight: 600, color: "#64748b", fontSize: 12 }}>Q{idx + 1}</span>
+                    <input
+                      type="text"
+                      className="ae-input"
+                      placeholder="e.g. T-Shirt Size / Dietary Preference / Prior Experience"
+                      value={q.label}
+                      onChange={(e) => {
+                        const updated = [...(formFields.customQuestions || [])];
+                        updated[idx].label = e.target.value;
+                        setFormFields((p) => ({ ...p, customQuestions: updated }));
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <select
+                      className="ae-input"
+                      style={{ width: 140 }}
+                      value={q.type}
+                      onChange={(e) => {
+                        const updated = [...(formFields.customQuestions || [])];
+                        updated[idx].type = e.target.value;
+                        setFormFields((p) => ({ ...p, customQuestions: updated }));
+                      }}
+                    >
+                      <option value="text">Short Text</option>
+                      <option value="textarea">Paragraph</option>
+                      <option value="select">Dropdown</option>
+                    </select>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(q.required)}
+                        onChange={(e) => {
+                          const updated = [...(formFields.customQuestions || [])];
+                          updated[idx].required = e.target.checked;
+                          setFormFields((p) => ({ ...p, customQuestions: updated }));
+                        }}
+                      />
+                      <span>Required</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = (formFields.customQuestions || []).filter((_, i) => i !== idx);
+                        setFormFields((p) => ({ ...p, customQuestions: updated }));
+                      }}
+                      style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: 6 }}
+                      title="Remove question"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
+                  {q.type === "select" && (
+                    <input
+                      type="text"
+                      className="ae-input"
+                      placeholder="Options separated by commas: S, M, L, XL, XXL"
+                      value={q.options || ""}
+                      onChange={(e) => {
+                        const updated = [...(formFields.customQuestions || [])];
+                        updated[idx].options = e.target.value;
+                        setFormFields((p) => ({ ...p, customQuestions: updated }));
+                      }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ── 2. Hero Images ── */}

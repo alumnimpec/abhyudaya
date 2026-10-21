@@ -90,9 +90,15 @@ export async function checkExistingRegistration(eventId, email) {
  * @returns {Promise<number>}
  */
 export async function countRegistrations(eventId) {
-  const q = query(registrationsRef, where("eventId", "==", eventId));
-  const snapshot = await getCountFromServer(q);
-  return snapshot.data().count;
+  if (!eventId) return 0;
+  try {
+    const q = query(registrationsRef, where("eventId", "==", eventId));
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count || 0;
+  } catch (err) {
+    console.warn("countRegistrations fallback:", err);
+    return 0;
+  }
 }
 
 /**
