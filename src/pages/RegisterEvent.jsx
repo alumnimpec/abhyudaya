@@ -5,7 +5,6 @@ import {
   FiCalendar,
   FiMapPin,
   FiVideo,
-  FiUsers,
   FiClock,
   FiCheckCircle,
   FiAlertCircle,
@@ -13,9 +12,10 @@ import {
   FiCheck,
   FiX,
   FiArrowRight,
+  FiArrowDown,
   FiRefreshCw,
+  FiSearch,
 } from "react-icons/fi";
-import PageHero from "../components/PageHero.jsx";
 import { getEventsPage } from "../Firebase/eventService.js";
 import {
   countRegistrations,
@@ -26,12 +26,22 @@ import "./RegisterEvent.css";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[+]?[\d\s-]{7,15}$/;
 
+const CATEGORIES = [
+  "All Events",
+  "Technical",
+  "Workshops",
+  "Literary",
+  "Cultural",
+  "Competitions",
+];
+
 function formatDateTime(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return null;
   return d.toLocaleDateString("en-IN", {
-    day: "2-digit",
+    weekday: "short",
+    day: "numeric",
     month: "short",
     year: "numeric",
     hour: "2-digit",
@@ -47,7 +57,7 @@ function getEventRegStatus(event, count) {
   }
 
   if (event.registrationOpen !== true) {
-    return { status: "CLOSED", label: "Registrations Closed", canRegister: false };
+    return { status: "CLOSED", label: "Registration Closed", canRegister: false };
   }
 
   if (event.registrationStartDate) {
@@ -76,7 +86,112 @@ function getEventRegStatus(event, count) {
     return { status: "FULL", label: "Fully Booked", canRegister: false };
   }
 
-  return { status: "OPEN", label: "Registration Open", canRegister: true };
+  return { status: "OPEN", label: "Register Now", canRegister: true };
+}
+
+function matchesCategory(event, category) {
+  if (category === "All Events") return true;
+
+  const target = category.toLowerCase();
+  const cat = String(event.category || "").toLowerCase();
+  const subtitle = String(event.subtitle || event.kind || "").toLowerCase();
+  const title = String(event.title || "").toLowerCase();
+  const desc = String(event.description || event.shortDescription || "").toLowerCase();
+  const text = `${cat} ${subtitle} ${title} ${desc}`;
+
+  if (target === "technical") {
+    return (
+      cat === "technical" ||
+      text.includes("tech") ||
+      text.includes("coding") ||
+      text.includes("software") ||
+      text.includes("ai") ||
+      text.includes("web") ||
+      text.includes("robotics")
+    );
+  }
+  if (target === "workshops") {
+    return (
+      cat === "workshop" ||
+      cat === "workshops" ||
+      text.includes("workshop") ||
+      text.includes("hands-on") ||
+      text.includes("bootcamp") ||
+      text.includes("masterclass") ||
+      text.includes("training")
+    );
+  }
+  if (target === "literary") {
+    return (
+      cat === "literary" ||
+      text.includes("literary") ||
+      text.includes("debate") ||
+      text.includes("quiz") ||
+      text.includes("mun") ||
+      text.includes("writing") ||
+      text.includes("speech") ||
+      text.includes("communicraft")
+    );
+  }
+  if (target === "cultural") {
+    return (
+      cat === "cultural" ||
+      text.includes("cultural") ||
+      text.includes("fest") ||
+      text.includes("music") ||
+      text.includes("dance") ||
+      text.includes("drama") ||
+      text.includes("art") ||
+      text.includes("creative")
+    );
+  }
+  if (target === "competitions") {
+    return (
+      cat === "competition" ||
+      cat === "competitions" ||
+      text.includes("competition") ||
+      text.includes("contest") ||
+      text.includes("spardha") ||
+      text.includes("challenge") ||
+      text.includes("hackathon") ||
+      text.includes("quiztronix")
+    );
+  }
+
+  return cat.includes(target) || text.includes(target);
+}
+
+// Status hierarchy priority:
+// 1: Closing Soon (Open & urgent)
+// 2: Open (Accepting registrations)
+// 3: Not Started (Upcoming, will open soon)
+// 4: Closed / Expired
+// 5: Fully Booked (Capacity reached)
+// 6: Other
+function getStatusPriority(statusInfo) {
+  if (statusInfo.canRegister) {
+    if (statusInfo.status === "CLOSING_SOON") return 1;
+    return 2;
+  }
+  if (statusInfo.status === "NOT_STARTED") return 3;
+  if (statusInfo.status === "CLOSED" || statusInfo.status === "EXPIRED") return 4;
+  if (statusInfo.status === "FULL") return 5;
+  return 6;
+}
+
+function compareEvents(a, b) {
+  const pA = getStatusPriority(a.statusInfo);
+  const pB = getStatusPriority(b.statusInfo);
+  if (pA !== pB) {
+    return pA - pB;
+  }
+  // Secondary sort: nearest upcoming event date first
+  const dateA = a.eventStartDate ? new Date(a.eventStartDate).getTime() : Infinity;
+  const dateB = b.eventStartDate ? new Date(b.eventStartDate).getTime() : Infinity;
+  if (dateA !== dateB) {
+    return dateA - dateB;
+  }
+  return (a.title || "").localeCompare(b.title || "");
 }
 
 export default function RegisterEvent() {
@@ -84,6 +199,10 @@ export default function RegisterEvent() {
   const [regCounts, setRegCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  /* ── Filter and Search State ── */
+  const [selectedCategory, setSelectedCategory] = useState("All Events");
+  const [searchQuery, setSearchQuery] = useState("");
 
   /* ── Registration Modal State ── */
   const [modalEvent, setModalEvent] = useState(null);
@@ -103,12 +222,12 @@ export default function RegisterEvent() {
   const [registrationResult, setRegistrationResult] = useState(null);
   const [copiedId, setCopiedId] = useState(false);
 
-  /* ── Load Published Events and Realtime Counts ── */
+  /* ── Load Published Events and Counts ── */
   const loadEventsData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await getEventsPage({ pageSize: 30, onlyPublished: true });
+      const res = await getEventsPage({ pageSize: 40, onlyPublished: true });
       const publishedEvents = res.events || [];
       setEvents(publishedEvents);
 
@@ -136,6 +255,17 @@ export default function RegisterEvent() {
     loadEventsData();
   }, [loadEventsData]);
 
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && modalEvent) {
+        closeRegistrationModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalEvent]);
+
   /* ── Events with Status Computations ── */
   const eventsWithStatus = useMemo(() => {
     return events.map((ev) => {
@@ -156,12 +286,48 @@ export default function RegisterEvent() {
     });
   }, [events, regCounts]);
 
-  /* ── Open Events count (for empty state decision) ── */
-  const hasOpenEvents = useMemo(() => {
-    return eventsWithStatus.some((e) => e.statusInfo.canRegister);
+  /* ── Global Open / Upcoming Events Check ── */
+  const hasOpenOrUpcomingEvents = useMemo(() => {
+    return eventsWithStatus.some(
+      (e) => e.statusInfo.canRegister || e.statusInfo.status === "NOT_STARTED"
+    );
   }, [eventsWithStatus]);
 
-  /* ── Open Registration Modal for an Event ── */
+  /* ── Filtered and Strictly Prioritized Events ── */
+  const filteredEvents = useMemo(() => {
+    const matches = eventsWithStatus.filter((ev) => {
+      const matchesCat = matchesCategory(ev, selectedCategory);
+      if (!matchesCat) return false;
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      const title = String(ev.title || "").toLowerCase();
+      const desc = String(ev.description || ev.shortDescription || ev.tagline || "").toLowerCase();
+      const venue = String(ev.venue || ev.location || "").toLowerCase();
+      const category = String(ev.category || ev.subtitle || "").toLowerCase();
+
+      return (
+        title.includes(q) ||
+        desc.includes(q) ||
+        venue.includes(q) ||
+        category.includes(q)
+      );
+    });
+
+    // Enforce priority ordering: Open first -> Upcoming next -> Closed -> Fully booked
+    return [...matches].sort(compareEvents);
+  }, [eventsWithStatus, selectedCategory, searchQuery]);
+
+  /* ── Segregate Open Events for Prominent Featured Section ── */
+  const openFilteredEvents = useMemo(() => {
+    return filteredEvents.filter((e) => e.statusInfo.canRegister);
+  }, [filteredEvents]);
+
+  const remainingFilteredEvents = useMemo(() => {
+    return filteredEvents.filter((e) => !e.statusInfo.canRegister);
+  }, [filteredEvents]);
+
+  /* ── Registration Modal Actions ── */
   const openRegistrationModal = (ev) => {
     setModalEvent(ev);
     setFormData({
@@ -191,19 +357,16 @@ export default function RegisterEvent() {
     const errs = {};
     const ff = modalEvent?.formFields || {};
 
-    // Full name is always required
     if (!formData.name.trim()) {
       errs.name = "Full name is required.";
     }
 
-    // Email is always required
     if (!formData.email.trim()) {
       errs.email = "Email address is required.";
     } else if (!EMAIL_REGEX.test(formData.email.trim())) {
       errs.email = "Please enter a valid email address.";
     }
 
-    // College Email (if enabled & required)
     if (ff.collegeEmail?.enabled !== false && ff.collegeEmail?.required) {
       if (!formData.collegeEmail.trim()) {
         errs.collegeEmail = "College email is required.";
@@ -212,14 +375,12 @@ export default function RegisterEvent() {
       }
     }
 
-    // Roll Number (if enabled & required)
     if (ff.rollNumber?.enabled !== false && ff.rollNumber?.required) {
       if (!formData.rollNumber.trim()) {
         errs.rollNumber = "Roll number / Student ID is required.";
       }
     }
 
-    // Department & Year (if enabled & required)
     if (ff.departmentYear?.enabled !== false && ff.departmentYear?.required) {
       if (!formData.department.trim()) {
         errs.department = "Department / Branch is required.";
@@ -229,16 +390,14 @@ export default function RegisterEvent() {
       }
     }
 
-    // Phone Number (if enabled & required)
     if (ff.phone?.enabled !== false && ff.phone?.required) {
       if (!formData.phone.trim()) {
         errs.phone = "Phone number is required.";
       } else if (!PHONE_REGEX.test(formData.phone.trim())) {
-        errs.phone = "Please enter a valid phone number (10 digits).";
+        errs.phone = "Please enter a valid phone number.";
       }
     }
 
-    // Custom Questions Validation
     const customQuestions = ff.customQuestions || [];
     customQuestions.forEach((q) => {
       if (q.required) {
@@ -267,7 +426,9 @@ export default function RegisterEvent() {
         eventTitle: modalEvent.title,
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
-        collegeEmail: formData.collegeEmail.trim().toLowerCase() || formData.email.trim().toLowerCase(),
+        collegeEmail:
+          formData.collegeEmail.trim().toLowerCase() ||
+          formData.email.trim().toLowerCase(),
         rollNumber: formData.rollNumber.trim(),
         department: formData.department.trim(),
         year: formData.year.trim(),
@@ -313,280 +474,692 @@ export default function RegisterEvent() {
   };
 
   return (
-    <>
+    <div className="reg-editorial-page">
       <Helmet>
-        <title>Open Event Registrations | Abhyudaya Club</title>
+        <title>Event Registrations | Abhyudaya Club — MPEC Kanpur</title>
         <meta
           name="description"
-          content="Explore and register for upcoming college events, workshops, hackathons, and cultural fests at Abhyudaya Club MPEC."
+          content="Discover inspiring conversations, technical workshops, flagship festivals, and competitions at Abhyudaya Club MPEC. Secure your seat today."
         />
         <meta name="robots" content="index,follow" />
       </Helmet>
 
-      <PageHero
-        eyebrow="Get Involved"
-        title="Open Event Registrations"
-        lede="Explore upcoming flagship fests, technical workshops, and competitions. Register online to secure your seat."
-      />
+      {/* ============================================================
+          1. EDITORIAL HERO SECTION
+         ============================================================ */}
+      <section className="reg-editorial-hero" aria-label="Registration Introduction">
+        <div className="reg-hero-bg-overlay" aria-hidden="true" />
+        <div className="reg-hero-container">
+          {/* Eyebrow */}
+          <div className="reg-hero-eyebrow-wrap">
+            <span className="reg-hero-sparkle" aria-hidden="true">✦</span>
+            <span className="reg-hero-eyebrow">ABHYUDAYA PRESENTS</span>
+            <span className="reg-hero-sparkle" aria-hidden="true">✦</span>
+          </div>
 
-      <div className="pub-reg-container">
-        {loading ? (
-          <div className="pub-reg-loading">
-            <div className="pub-reg-spinner" />
-            <p>Loading open registrations...</p>
+          {/* Main Heading */}
+          <h1 className="reg-hero-heading">
+            Find Your Next <span className="reg-hero-heading-italic">Experience.</span>
+          </h1>
+
+          {/* Subtle Gold Divider */}
+          <div className="reg-hero-divider" aria-hidden="true">
+            <span className="reg-hero-divider-line" />
+            <span className="reg-hero-divider-diamond">◆</span>
+            <span className="reg-hero-divider-line" />
           </div>
-        ) : error ? (
-          <div className="pub-reg-empty-card">
-            <span className="pub-reg-empty-icon">⚠️</span>
-            <h2>Unable to load events</h2>
-            <p>{error}</p>
-            <button
-              type="button"
-              className="pub-reg-btn pub-reg-btn-primary"
-              onClick={loadEventsData}
-            >
-              <FiRefreshCw /> <span>Retry Loading</span>
-            </button>
-          </div>
-        ) : !hasOpenEvents ? (
-          <div className="pub-reg-empty-card">
-            <span className="pub-reg-empty-icon">📅</span>
-            <h2>No Open Registrations</h2>
-            <p>
-              There are currently no events accepting new registrations. Upcoming events will be published here as soon as registrations open.
-            </p>
-            <Link to="/events" className="pub-reg-btn pub-reg-btn-primary">
-              ← Back to Events
+
+          {/* Description */}
+          <p className="reg-hero-description">
+            From inspiring conversations to hands-on workshops, discover the
+            experiences that bring our campus together.
+          </p>
+
+          {/* Hero Actions */}
+          <div className="reg-hero-actions">
+            <a href="#events-hub" className="reg-hero-btn reg-hero-btn-primary">
+              <span>Explore Events</span>
+              <FiArrowDown className="reg-btn-icon-bounce" />
+            </a>
+            <Link to="/events" className="reg-hero-btn reg-hero-btn-ghost">
+              <span>Past Highlights</span>
+              <FiArrowRight />
             </Link>
           </div>
-        ) : (
-          <div className="pub-reg-events-grid">
-            {eventsWithStatus.map((event) => {
-              const { statusInfo, count, maxLimit, remainingSeats, percentFilled } = event;
-              const isEventOpen = statusInfo.canRegister;
-
-              return (
-                <div key={event.id} className="pub-event-card">
-                  {/* Banner Header */}
-                  <div className="pub-card-banner">
-                    {event.banner || event.image ? (
-                      <img
-                        src={event.banner || event.image}
-                        alt={event.title}
-                        className="pub-card-img"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="pub-card-img-fallback">
-                        <span>{event.icon || "📅"}</span>
-                      </div>
-                    )}
-                    <div className="pub-card-badges">
-                      <span className="pub-category-badge">
-                        {event.category || event.subtitle || "Club Event"}
-                      </span>
-                      <span
-                        className={`pub-status-badge ${
-                          isEventOpen
-                            ? statusInfo.status === "CLOSING_SOON"
-                              ? "status-closing"
-                              : "status-open"
-                            : "status-closed"
-                        }`}
-                      >
-                        {statusInfo.label}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card Body */}
-                  <div className="pub-card-body">
-                    <h3 className="pub-card-title">{event.title}</h3>
-                    {event.tagline && <p className="pub-card-tagline">{event.tagline}</p>}
-
-                    {/* Metadata Items */}
-                    <div className="pub-card-meta">
-                      <div className="pub-meta-row">
-                        <FiCalendar className="pub-meta-icon" />
-                        <span>
-                          {event.eventStartDate
-                            ? formatDateTime(event.eventStartDate)
-                            : "Date to be announced"}
-                        </span>
-                      </div>
-
-                      <div className="pub-meta-row">
-                        {event.meetingLink ? (
-                          <FiVideo className="pub-meta-icon" />
-                        ) : (
-                          <FiMapPin className="pub-meta-icon" />
-                        )}
-                        <span>
-                          {event.venue ||
-                            event.location ||
-                            (event.meetingLink ? "Online / Virtual Meet" : "Venue to be announced")}
-                        </span>
-                      </div>
-
-                      {event.registrationDeadline && (
-                        <div className="pub-meta-row deadline-highlight">
-                          <FiClock className="pub-meta-icon" />
-                          <span>
-                            Closes: {formatDateTime(event.registrationDeadline)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Seats & Capacity Section */}
-                    <div className="pub-capacity-box">
-                      <div className="pub-capacity-header">
-                        <span className="pub-capacity-label">Available Seats</span>
-                        <span className="pub-capacity-ratio">
-                          {maxLimit !== null ? (
-                            <>
-                              <strong>{remainingSeats}</strong> left of {maxLimit}
-                            </>
-                          ) : (
-                            <span className="text-emerald">Unlimited</span>
-                          )}
-                        </span>
-                      </div>
-
-                      {maxLimit !== null && (
-                        <div className="pub-progress-track">
-                          <div
-                            className={`pub-progress-fill ${
-                              percentFilled >= 100
-                                ? "fill-red"
-                                : percentFilled >= 75
-                                ? "fill-amber"
-                                : "fill-emerald"
-                            }`}
-                            style={{ width: `${percentFilled}%` }}
-                          />
-                        </div>
-                      )}
-
-                      <div className="pub-seat-alert">
-                        {maxLimit !== null ? (
-                          remainingSeats === 0 ? (
-                            <span className="alert-full">❌ Capacity reached</span>
-                          ) : remainingSeats <= 10 ? (
-                            <span className="alert-urgent">🔥 Hurry! Only {remainingSeats} seats left!</span>
-                          ) : (
-                            <span className="alert-available">⚡ {remainingSeats} seats available</span>
-                          )
-                        ) : (
-                          <span className="alert-available">✨ Open to all participants</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Register Action Button */}
-                    <div className="pub-card-actions">
-                      {isEventOpen ? (
-                        <button
-                          type="button"
-                          className="pub-register-btn"
-                          onClick={() => openRegistrationModal(event)}
-                        >
-                          <span>Register Now</span>
-                          <FiArrowRight />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="pub-register-btn disabled"
-                          disabled
-                        >
-                          <span>{statusInfo.label}</span>
-                        </button>
-                      )}
-
-                      <Link
-                        to={`/events/${event.slug || event.id}`}
-                        className="pub-details-link"
-                      >
-                        Event Details
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+        </div>
+      </section>
 
       {/* ============================================================
-          REGISTRATION MODAL
+          2. UPCOMING EXPERIENCES HUB & TOOLBAR
+         ============================================================ */}
+      <main id="events-hub" className="reg-editorial-main">
+        <div className="reg-main-container">
+          {/* Search & Category Filter Toolbar */}
+          <div className="reg-toolbar">
+            {/* Category Filter Pills */}
+            <div className="reg-filter-scroll" role="tablist" aria-label="Event Categories">
+              {CATEGORIES.map((cat) => {
+                const isSelected = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    className={`reg-filter-pill ${isSelected ? "is-active" : ""}`}
+                    onClick={() => setSelectedCategory(cat)}
+                  >
+                    <span>{cat}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search Input Box */}
+            <div className="reg-search-box">
+              <FiSearch className="reg-search-icon" aria-hidden="true" />
+              <input
+                type="text"
+                className="reg-search-input"
+                placeholder="Search by title, topic, or venue..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search events"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="reg-search-clear"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search query"
+                >
+                  <FiX />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ============================================================
+              3. CONTENT STATES & PRIORITY EVENT SECTIONS
+             ============================================================ */}
+          {loading ? (
+            /* Loading Skeletons */
+            <div className="reg-grid-skeleton" aria-label="Loading events">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="reg-card-skeleton">
+                  <div className="reg-skeleton-media" />
+                  <div className="reg-skeleton-body">
+                    <div className="reg-skeleton-line reg-skel-tag" />
+                    <div className="reg-skeleton-line reg-skel-title" />
+                    <div className="reg-skeleton-line reg-skel-desc" />
+                    <div className="reg-skeleton-line reg-skel-meta" />
+                    <div className="reg-skeleton-line reg-skel-btn" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            /* Error Card */
+            <div className="reg-editorial-empty-card" role="alert">
+              <div className="reg-empty-icon-wrap">
+                <FiAlertCircle className="reg-empty-icon text-amber" />
+              </div>
+              <h3 className="reg-empty-heading">Unable to Load Events</h3>
+              <p className="reg-empty-desc">{error}</p>
+              <button
+                type="button"
+                className="reg-btn-editorial-gold"
+                onClick={loadEventsData}
+              >
+                <FiRefreshCw />
+                <span>Retry Connection</span>
+              </button>
+            </div>
+          ) : !hasOpenOrUpcomingEvents && eventsWithStatus.length === 0 ? (
+            /* Polished Editorial Empty State (No Open Registrations) */
+            <div className="reg-editorial-empty-card" aria-label="No registrations available">
+              <div className="reg-calendar-illustration" aria-hidden="true">
+                <svg
+                  width="120"
+                  height="120"
+                  viewBox="0 0 120 120"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="reg-calendar-svg"
+                >
+                  <rect
+                    x="20"
+                    y="28"
+                    width="80"
+                    height="76"
+                    rx="14"
+                    fill="#10182D"
+                    fillOpacity="0.08"
+                    transform="translate(0, 4)"
+                  />
+                  <rect
+                    x="20"
+                    y="24"
+                    width="80"
+                    height="76"
+                    rx="14"
+                    fill="#FAF4E9"
+                    stroke="#10182D"
+                    strokeWidth="2.5"
+                  />
+                  <path
+                    d="M20 38C20 30.268 26.268 24 34 24H86C93.732 24 100 30.268 100 38V44H20V38Z"
+                    fill="#10182D"
+                  />
+                  <rect x="36" y="16" width="6" height="14" rx="3" fill="#E7B544" />
+                  <rect x="57" y="16" width="6" height="14" rx="3" fill="#E7B544" />
+                  <rect x="78" y="16" width="6" height="14" rx="3" fill="#E7B544" />
+                  <circle cx="38" cy="58" r="3.5" fill="#10182D" fillOpacity="0.3" />
+                  <circle cx="60" cy="58" r="3.5" fill="#10182D" fillOpacity="0.3" />
+                  <circle cx="82" cy="58" r="3.5" fill="#10182D" fillOpacity="0.3" />
+                  <circle cx="38" cy="74" r="3.5" fill="#10182D" fillOpacity="0.3" />
+                  <path
+                    d="M60 67L62.094 71.748L67.243 72.316L63.407 75.787L64.462 80.854L60 78.27L55.538 80.854L56.593 75.787L52.757 72.316L57.906 71.748L60 67Z"
+                    fill="#E7B544"
+                  />
+                  <circle cx="82" cy="74" r="3.5" fill="#10182D" fillOpacity="0.3" />
+                  <path
+                    d="M96 16L97.5 21L102.5 22.5L97.5 24L96 29L94.5 24L89.5 22.5L94.5 21L96 16Z"
+                    fill="#E7B544"
+                  />
+                </svg>
+              </div>
+
+              <h3 className="reg-empty-heading">Something Worth Looking Forward To</h3>
+              <p className="reg-empty-desc">
+                From technical deep-dives to vibrant cultural gatherings, our next
+                series of campus experiences is currently being curated. Check back
+                soon or browse our archive of celebrated past events.
+              </p>
+
+              <div className="reg-empty-actions">
+                <Link to="/events" className="reg-btn-editorial-gold">
+                  <span>← Back to Events</span>
+                </Link>
+              </div>
+            </div>
+          ) : filteredEvents.length === 0 ? (
+            /* Search / Filter Yielded No Results */
+            <div className="reg-editorial-empty-card" role="status">
+              <span className="reg-empty-symbol">🔍</span>
+              <h3 className="reg-empty-heading">No Matching Experiences</h3>
+              <p className="reg-empty-desc">
+                We couldn't find any events matching{" "}
+                {searchQuery ? <strong>"{searchQuery}"</strong> : "your filter"}{" "}
+                in the <em>{selectedCategory}</em> category.
+              </p>
+              <button
+                type="button"
+                className="reg-btn-editorial-gold"
+                onClick={() => {
+                  setSelectedCategory("All Events");
+                  setSearchQuery("");
+                }}
+              >
+                <span>Reset All Filters</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* ============================================================
+                  3A. FEATURED SECTION: "REGISTRATIONS OPEN NOW"
+                  Prominently displays every event currently accepting registrations
+                 ============================================================ */}
+              {openFilteredEvents.length > 0 && (
+                <section
+                  className="reg-featured-open-section"
+                  aria-labelledby="featured-open-heading"
+                >
+                  <div className="reg-featured-section-header">
+                    <div className="reg-live-eyebrow">
+                      <span className="reg-live-pulse-dot" aria-hidden="true" />
+                      <span>ACTIVE REGISTRATIONS</span>
+                    </div>
+                    <h2
+                      id="featured-open-heading"
+                      className="reg-featured-section-title"
+                    >
+                      Registrations Open Now
+                    </h2>
+                    <p className="reg-featured-section-subtitle">
+                      Your next experience is waiting. Explore events and secure your spot.
+                    </p>
+                  </div>
+
+                  <div
+                    className={`reg-featured-grid ${
+                      openFilteredEvents.length === 1 ? "single-featured" : ""
+                    }`}
+                  >
+                    {openFilteredEvents.map((event) => {
+                      const {
+                        statusInfo,
+                        maxLimit,
+                        remainingSeats,
+                        percentFilled,
+                      } = event;
+
+                      return (
+                        <article
+                          key={event.id}
+                          className="reg-featured-card"
+                          aria-label={`Featured open event: ${event.title}`}
+                        >
+                          {/* Large Media Banner */}
+                          <div className="reg-featured-media">
+                            {event.banner || event.image ? (
+                              <img
+                                src={event.banner || event.image}
+                                alt={event.title}
+                                className="reg-featured-img"
+                                loading="eager"
+                              />
+                            ) : (
+                              <div className="reg-featured-fallback-banner">
+                                <span className="reg-featured-fallback-icon">
+                                  {event.icon || "🏛️"}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Prominent High-Contrast Registration Open Badge */}
+                            <div className="reg-featured-badge-wrap">
+                              <span className="reg-featured-badge-open">
+                                <span className="reg-badge-glow-dot" aria-hidden="true" />
+                                <span>REGISTRATION OPEN</span>
+                              </span>
+                            </div>
+
+                            {/* Category Pill */}
+                            <span className="reg-featured-category-pill">
+                              {event.category || event.subtitle || "Featured Experience"}
+                            </span>
+                          </div>
+
+                          {/* Featured Card Content */}
+                          <div className="reg-featured-body">
+                            {/* Metadata */}
+                            <div className="reg-featured-meta-row">
+                              <div className="reg-featured-meta-pill">
+                                <FiCalendar className="reg-meta-icon" />
+                                <span>
+                                  {event.eventStartDate
+                                    ? formatDateTime(event.eventStartDate)
+                                    : "Date to be announced"}
+                                </span>
+                              </div>
+
+                              <div className="reg-featured-meta-pill">
+                                {event.meetingLink ? (
+                                  <FiVideo className="reg-meta-icon" />
+                                ) : (
+                                  <FiMapPin className="reg-meta-icon" />
+                                )}
+                                <span className="reg-meta-venue-truncate">
+                                  {event.venue ||
+                                    event.location ||
+                                    (event.meetingLink ? "Virtual Meeting" : "MPEC Campus")}
+                                </span>
+                              </div>
+
+                              {event.registrationDeadline && (
+                                <div className="reg-featured-meta-pill reg-meta-deadline">
+                                  <FiClock className="reg-meta-icon" />
+                                  <span>
+                                    Closes: {formatDateTime(event.registrationDeadline)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Title & Description */}
+                            <h3 className="reg-featured-title">{event.title}</h3>
+                            <p className="reg-featured-desc">
+                              {event.tagline ||
+                                event.shortDescription ||
+                                event.description ||
+                                "Join this flagship session organized by Abhyudaya Club."}
+                            </p>
+
+                            {/* Available Seats Indicator (Only when verified by capacity limit data) */}
+                            {maxLimit !== null && (
+                              <div className="reg-featured-seats-box">
+                                <div className="reg-featured-seats-header">
+                                  <span className="reg-seats-label">Available Seats</span>
+                                  <span className="reg-seats-count">
+                                    <strong>{remainingSeats}</strong> left of {maxLimit}
+                                  </span>
+                                </div>
+
+                                <div className="reg-featured-seats-track">
+                                  <div
+                                    className={`reg-featured-seats-fill ${
+                                      remainingSeats <= 10 ? "urgent" : "normal"
+                                    }`}
+                                    style={{ width: `${percentFilled}%` }}
+                                  />
+                                </div>
+
+                                <span className="reg-seats-subtext">
+                                  {remainingSeats <= 10
+                                    ? `🔥 High demand: Only ${remainingSeats} seats remaining`
+                                    : `⚡ Open for registration`}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Highly Visible Gold Call To Action Button */}
+                            <div className="reg-featured-actions">
+                              <button
+                                type="button"
+                                className="reg-featured-btn-register"
+                                onClick={() => openRegistrationModal(event)}
+                              >
+                                <span>Register Now →</span>
+                              </button>
+
+                              <Link
+                                to={`/events/${event.slug || event.id}`}
+                                className="reg-featured-btn-details"
+                              >
+                                <span>View Details</span>
+                              </Link>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* ============================================================
+                  3B. GENERAL / ALL EXPERIENCES SECTION
+                  Sorted by status priority: Open -> Upcoming -> Closed -> Fully Booked
+                 ============================================================ */}
+              <section
+                className="reg-general-section"
+                aria-labelledby="general-experiences-heading"
+              >
+                <div className="reg-section-header">
+                  <div className="reg-section-eyebrow">
+                    {openFilteredEvents.length > 0
+                      ? "ALL CAMPUS CALENDAR"
+                      : "CAMPUS EXPERIENCES"}
+                  </div>
+                  <h2
+                    id="general-experiences-heading"
+                    className="reg-section-title"
+                  >
+                    {openFilteredEvents.length > 0
+                      ? "All Experiences & Schedule"
+                      : "Upcoming Experiences"}
+                  </h2>
+                  <p className="reg-section-subtitle">
+                    {openFilteredEvents.length > 0
+                      ? "Explore the comprehensive event schedule, upcoming sessions, and recent archives."
+                      : "Reserve your place in upcoming club gatherings, technical intensives, and flagship competitions."}
+                  </p>
+                </div>
+
+                <div className="reg-editorial-grid">
+                  {filteredEvents.map((event) => {
+                    const {
+                      statusInfo,
+                      maxLimit,
+                      remainingSeats,
+                      percentFilled,
+                    } = event;
+                    const isEventOpen = statusInfo.canRegister;
+
+                    return (
+                      <article key={event.id} className="reg-event-card">
+                        {/* Media Banner */}
+                        <div className="reg-card-media">
+                          {event.banner || event.image ? (
+                            <img
+                              src={event.banner || event.image}
+                              alt={event.title}
+                              className="reg-card-img"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="reg-card-fallback-banner">
+                              <span className="reg-fallback-icon">
+                                {event.icon || "🏛️"}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Floating Category Pill */}
+                          <span className="reg-card-category-pill">
+                            {event.category || event.subtitle || "Abhyudaya"}
+                          </span>
+
+                          {/* Floating Status Badge */}
+                          <span
+                            className={`reg-card-status-badge status-${statusInfo.status.toLowerCase()}`}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </div>
+
+                        {/* Card Content */}
+                        <div className="reg-card-content">
+                          {/* Meta: Date & Venue */}
+                          <div className="reg-card-meta">
+                            <div className="reg-meta-item">
+                              <FiCalendar className="reg-meta-icon" />
+                              <span>
+                                {event.eventStartDate
+                                  ? formatDateTime(event.eventStartDate)
+                                  : "Date to be announced"}
+                              </span>
+                            </div>
+
+                            <div className="reg-meta-item">
+                              {event.meetingLink ? (
+                                <FiVideo className="reg-meta-icon" />
+                              ) : (
+                                <FiMapPin className="reg-meta-icon" />
+                              )}
+                              <span className="reg-meta-venue-truncate">
+                                {event.venue ||
+                                  event.location ||
+                                  (event.meetingLink ? "Virtual Meeting" : "MPEC Campus")}
+                              </span>
+                            </div>
+
+                            {event.registrationDeadline && (
+                              <div className="reg-meta-item reg-deadline-item">
+                                <FiClock className="reg-meta-icon" />
+                                <span>
+                                  Deadline: {formatDateTime(event.registrationDeadline)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Title & Tagline */}
+                          <h3 className="reg-card-title">{event.title}</h3>
+                          {event.tagline ? (
+                            <p className="reg-card-tagline">{event.tagline}</p>
+                          ) : event.shortDescription || event.description ? (
+                            <p className="reg-card-tagline">
+                              {event.shortDescription || event.description}
+                            </p>
+                          ) : null}
+
+                          {/* Available Seats Indicator */}
+                          {maxLimit !== null && (
+                            <div className="reg-card-capacity-wrap">
+                              <div className="reg-capacity-header">
+                                <span className="reg-capacity-label">Available Seats</span>
+                                <span className="reg-capacity-numbers">
+                                  <strong>{remainingSeats}</strong> left of {maxLimit}
+                                </span>
+                              </div>
+
+                              <div className="reg-capacity-progress-track">
+                                <div
+                                  className={`reg-capacity-progress-fill ${
+                                    remainingSeats === 0
+                                      ? "is-full"
+                                      : remainingSeats <= 10
+                                      ? "is-urgent"
+                                      : "is-normal"
+                                  }`}
+                                  style={{ width: `${percentFilled}%` }}
+                                />
+                              </div>
+
+                              <div className="reg-capacity-badge-row">
+                                {remainingSeats === 0 ? (
+                                  <span className="reg-capacity-badge-pill is-full">
+                                    Capacity Reached
+                                  </span>
+                                ) : remainingSeats <= 10 ? (
+                                  <span className="reg-capacity-badge-pill is-urgent">
+                                    Only {remainingSeats} seats remaining
+                                  </span>
+                                ) : (
+                                  <span className="reg-capacity-badge-pill is-normal">
+                                    Open registration active
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Card Footer Actions */}
+                          <div className="reg-card-footer">
+                            {isEventOpen ? (
+                              <button
+                                type="button"
+                                className="reg-card-btn-primary"
+                                onClick={() => openRegistrationModal(event)}
+                              >
+                                <span>Register Now</span>
+                                <FiArrowRight className="reg-btn-arrow" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="reg-card-btn-disabled"
+                                disabled
+                              >
+                                <span>{statusInfo.label}</span>
+                              </button>
+                            )}
+
+                            <Link
+                              to={`/events/${event.slug || event.id}`}
+                              className="reg-card-btn-details"
+                            >
+                              <span>View Details</span>
+                            </Link>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      </main>
+
+      {/* ============================================================
+          4. REGISTRATION FORM MODAL & PASS
          ============================================================ */}
       {modalEvent && (
-        <div className="pub-modal-backdrop" onClick={closeRegistrationModal}>
+        <div
+          className="reg-modal-backdrop"
+          onClick={closeRegistrationModal}
+          role="presentation"
+        >
           <div
-            className="pub-modal-dialog"
+            className="reg-modal-dialog"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="reg-modal-title"
           >
-            <div className="pub-modal-header">
-              <div>
-                <span className="pub-modal-eyebrow">Event Registration</span>
-                <h2 id="reg-modal-title">{modalEvent.title}</h2>
-                <div className="pub-modal-submeta">
+            {/* Modal Header */}
+            <div className="reg-modal-header">
+              <div className="reg-modal-header-text">
+                <span className="reg-modal-eyebrow">ABHYUDAYA REGISTRATION</span>
+                <h2 id="reg-modal-title" className="reg-modal-title">
+                  {modalEvent.title}
+                </h2>
+                <div className="reg-modal-meta-row">
                   {modalEvent.eventStartDate && (
                     <span>📅 {formatDateTime(modalEvent.eventStartDate)}</span>
                   )}
-                  {modalEvent.venue && <span>📍 {modalEvent.venue}</span>}
+                  {modalEvent.venue && (
+                    <span>📍 {modalEvent.venue}</span>
+                  )}
                 </div>
               </div>
+
               <button
                 type="button"
-                className="pub-modal-close-btn"
+                className="reg-modal-close-btn"
                 onClick={closeRegistrationModal}
-                aria-label="Close form"
+                aria-label="Close registration form"
               >
                 <FiX />
               </button>
             </div>
 
+            {/* Modal Body: Either Success View or Interactive Form */}
             {registrationResult ? (
               /* Success View */
-              <div className="pub-success-view">
-                <div className="pub-success-icon-wrap">
-                  <FiCheckCircle className="pub-success-icon" />
+              <div className="reg-modal-success-view">
+                <div className="reg-success-icon-badge" aria-hidden="true">
+                  <FiCheckCircle className="reg-success-icon" />
                 </div>
-                <h3>Registration Successful!</h3>
-                <p className="pub-success-desc">
-                  Congratulations <strong>{registrationResult.name}</strong>, your seat for{" "}
-                  <strong>{registrationResult.eventTitle}</strong> is confirmed.
+
+                <h3 className="reg-success-heading">Registration Confirmed</h3>
+                <p className="reg-success-subtext">
+                  Welcome aboard, <strong>{registrationResult.name}</strong>! Your
+                  spot for <strong>{registrationResult.eventTitle}</strong> is
+                  officially reserved.
                 </p>
 
-                <div className="pub-reg-id-card">
-                  <span className="id-label">Your Registration Pass ID</span>
-                  <div className="id-code-row">
-                    <span className="id-code">{registrationResult.registrationId}</span>
+                {/* Registration ID Pass Card */}
+                <div className="reg-pass-card">
+                  <span className="reg-pass-label">OFFICIAL REGISTRATION PASS</span>
+                  <div className="reg-pass-code-row">
+                    <span className="reg-pass-code">
+                      {registrationResult.registrationId}
+                    </span>
                     <button
                       type="button"
-                      className="pub-copy-btn"
+                      className="reg-pass-copy-btn"
                       onClick={handleCopyId}
-                      title="Copy Registration ID"
+                      title="Copy Pass ID to clipboard"
                     >
                       {copiedId ? <FiCheck /> : <FiCopy />}
-                      <span>{copiedId ? "Copied!" : "Copy"}</span>
+                      <span>{copiedId ? "Copied" : "Copy ID"}</span>
                     </button>
                   </div>
-                  <p className="id-hint">
-                    Please take a screenshot or note this ID. You may be asked to show it at the event venue.
+                  <p className="reg-pass-hint">
+                    Please take a screenshot or keep note of this pass. You may be
+                    prompted to present it at the entry desk.
                   </p>
                 </div>
 
-                <div className="pub-success-actions">
+                <div className="reg-success-actions">
                   <button
                     type="button"
-                    className="pub-reg-btn pub-reg-btn-primary"
+                    className="reg-btn-editorial-gold"
                     onClick={closeRegistrationModal}
                   >
                     Done &amp; Close
@@ -595,150 +1168,187 @@ export default function RegisterEvent() {
               </div>
             ) : (
               /* Registration Form */
-              <form onSubmit={handleSubmitRegistration} className="pub-modal-form" noValidate>
+              <form
+                onSubmit={handleSubmitRegistration}
+                className="reg-modal-form"
+                noValidate
+              >
                 {submitError && (
-                  <div className="pub-form-error-banner">
-                    <FiAlertCircle />
+                  <div className="reg-form-error-banner" role="alert">
+                    <FiAlertCircle className="reg-error-icon" />
                     <span>{submitError}</span>
                   </div>
                 )}
 
-                <div className="pub-form-body">
+                <div className="reg-form-fields-scroll">
                   {/* Full Name */}
-                  <div className="pub-form-group">
-                    <label htmlFor="reg-name">
-                      Full Name <span className="req">*</span>
+                  <div className="reg-form-group">
+                    <label htmlFor="reg-name" className="reg-form-label">
+                      Full Name <span className="reg-required">*</span>
                     </label>
                     <input
                       id="reg-name"
                       type="text"
-                      className={`pub-input ${formErrors.name ? "has-error" : ""}`}
+                      className={`reg-form-input ${
+                        formErrors.name ? "has-error" : ""
+                      }`}
                       placeholder="e.g. Aryan Sharma"
                       value={formData.name}
                       onChange={(e) => {
                         setFormData((p) => ({ ...p, name: e.target.value }));
                         setFormErrors((p) => ({ ...p, name: "" }));
                       }}
+                      disabled={submitting}
                     />
                     {formErrors.name && (
-                      <span className="pub-err-msg">{formErrors.name}</span>
+                      <span className="reg-field-error-msg">{formErrors.name}</span>
                     )}
                   </div>
 
                   {/* Primary Email */}
-                  <div className="pub-form-group">
-                    <label htmlFor="reg-email">
-                      Personal / Verified Email <span className="req">*</span>
+                  <div className="reg-form-group">
+                    <label htmlFor="reg-email" className="reg-form-label">
+                      Personal / Verified Email <span className="reg-required">*</span>
                     </label>
                     <input
                       id="reg-email"
                       type="email"
-                      className={`pub-input ${formErrors.email ? "has-error" : ""}`}
+                      className={`reg-form-input ${
+                        formErrors.email ? "has-error" : ""
+                      }`}
                       placeholder="e.g. aryan@gmail.com"
                       value={formData.email}
                       onChange={(e) => {
                         setFormData((p) => ({ ...p, email: e.target.value }));
                         setFormErrors((p) => ({ ...p, email: "" }));
                       }}
+                      disabled={submitting}
                     />
                     {formErrors.email && (
-                      <span className="pub-err-msg">{formErrors.email}</span>
+                      <span className="reg-field-error-msg">{formErrors.email}</span>
                     )}
                   </div>
 
                   {/* College Email (if enabled) */}
                   {modalEvent.formFields?.collegeEmail?.enabled !== false && (
-                    <div className="pub-form-group">
-                      <label htmlFor="reg-college-email">
+                    <div className="reg-form-group">
+                      <label htmlFor="reg-college-email" className="reg-form-label">
                         College Email{" "}
                         {modalEvent.formFields?.collegeEmail?.required && (
-                          <span className="req">*</span>
+                          <span className="reg-required">*</span>
                         )}
                       </label>
                       <input
                         id="reg-college-email"
                         type="email"
-                        className={`pub-input ${formErrors.collegeEmail ? "has-error" : ""}`}
+                        className={`reg-form-input ${
+                          formErrors.collegeEmail ? "has-error" : ""
+                        }`}
                         placeholder="e.g. aryan.21cs@mpgi.edu.in"
                         value={formData.collegeEmail}
                         onChange={(e) => {
-                          setFormData((p) => ({ ...p, collegeEmail: e.target.value }));
+                          setFormData((p) => ({
+                            ...p,
+                            collegeEmail: e.target.value,
+                          }));
                           setFormErrors((p) => ({ ...p, collegeEmail: "" }));
                         }}
+                        disabled={submitting}
                       />
                       {formErrors.collegeEmail && (
-                        <span className="pub-err-msg">{formErrors.collegeEmail}</span>
+                        <span className="reg-field-error-msg">
+                          {formErrors.collegeEmail}
+                        </span>
                       )}
                     </div>
                   )}
 
                   {/* Roll Number (if enabled) */}
                   {modalEvent.formFields?.rollNumber?.enabled !== false && (
-                    <div className="pub-form-group">
-                      <label htmlFor="reg-roll">
+                    <div className="reg-form-group">
+                      <label htmlFor="reg-roll" className="reg-form-label">
                         College Roll Number / Student ID{" "}
                         {modalEvent.formFields?.rollNumber?.required && (
-                          <span className="req">*</span>
+                          <span className="reg-required">*</span>
                         )}
                       </label>
                       <input
                         id="reg-roll"
                         type="text"
-                        className={`pub-input ${formErrors.rollNumber ? "has-error" : ""}`}
+                        className={`reg-form-input ${
+                          formErrors.rollNumber ? "has-error" : ""
+                        }`}
                         placeholder="e.g. 2101640100045"
                         value={formData.rollNumber}
                         onChange={(e) => {
-                          setFormData((p) => ({ ...p, rollNumber: e.target.value }));
+                          setFormData((p) => ({
+                            ...p,
+                            rollNumber: e.target.value,
+                          }));
                           setFormErrors((p) => ({ ...p, rollNumber: "" }));
                         }}
+                        disabled={submitting}
                       />
                       {formErrors.rollNumber && (
-                        <span className="pub-err-msg">{formErrors.rollNumber}</span>
+                        <span className="reg-field-error-msg">
+                          {formErrors.rollNumber}
+                        </span>
                       )}
                     </div>
                   )}
 
                   {/* Department & Year (if enabled) */}
                   {modalEvent.formFields?.departmentYear?.enabled !== false && (
-                    <div className="pub-form-row">
-                      <div className="pub-form-group">
-                        <label htmlFor="reg-dept">
+                    <div className="reg-form-row">
+                      <div className="reg-form-group">
+                        <label htmlFor="reg-dept" className="reg-form-label">
                           Department / Branch{" "}
                           {modalEvent.formFields?.departmentYear?.required && (
-                            <span className="req">*</span>
+                            <span className="reg-required">*</span>
                           )}
                         </label>
                         <input
                           id="reg-dept"
                           type="text"
-                          className={`pub-input ${formErrors.department ? "has-error" : ""}`}
+                          className={`reg-form-input ${
+                            formErrors.department ? "has-error" : ""
+                          }`}
                           placeholder="e.g. CSE, IT, ME, ECE"
                           value={formData.department}
                           onChange={(e) => {
-                            setFormData((p) => ({ ...p, department: e.target.value }));
+                            setFormData((p) => ({
+                              ...p,
+                              department: e.target.value,
+                            }));
                             setFormErrors((p) => ({ ...p, department: "" }));
                           }}
+                          disabled={submitting}
                         />
                         {formErrors.department && (
-                          <span className="pub-err-msg">{formErrors.department}</span>
+                          <span className="reg-field-error-msg">
+                            {formErrors.department}
+                          </span>
                         )}
                       </div>
 
-                      <div className="pub-form-group">
-                        <label htmlFor="reg-year">
+                      <div className="reg-form-group">
+                        <label htmlFor="reg-year" className="reg-form-label">
                           Year / Semester{" "}
                           {modalEvent.formFields?.departmentYear?.required && (
-                            <span className="req">*</span>
+                            <span className="reg-required">*</span>
                           )}
                         </label>
                         <select
                           id="reg-year"
-                          className={`pub-select ${formErrors.year ? "has-error" : ""}`}
+                          className={`reg-form-select ${
+                            formErrors.year ? "has-error" : ""
+                          }`}
                           value={formData.year}
                           onChange={(e) => {
                             setFormData((p) => ({ ...p, year: e.target.value }));
                             setFormErrors((p) => ({ ...p, year: "" }));
                           }}
+                          disabled={submitting}
                         >
                           <option value="">Select Year</option>
                           <option value="1st Year">1st Year</option>
@@ -749,7 +1359,9 @@ export default function RegisterEvent() {
                           <option value="Faculty / Other">Faculty / Other</option>
                         </select>
                         {formErrors.year && (
-                          <span className="pub-err-msg">{formErrors.year}</span>
+                          <span className="reg-field-error-msg">
+                            {formErrors.year}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -757,26 +1369,31 @@ export default function RegisterEvent() {
 
                   {/* Phone Number (if enabled) */}
                   {modalEvent.formFields?.phone?.enabled !== false && (
-                    <div className="pub-form-group">
-                      <label htmlFor="reg-phone">
-                        WhatsApp / Phone Number{" "}
+                    <div className="reg-form-group">
+                      <label htmlFor="reg-phone" className="reg-form-label">
+                        WhatsApp / Contact Number{" "}
                         {modalEvent.formFields?.phone?.required && (
-                          <span className="req">*</span>
+                          <span className="reg-required">*</span>
                         )}
                       </label>
                       <input
                         id="reg-phone"
                         type="tel"
-                        className={`pub-input ${formErrors.phone ? "has-error" : ""}`}
+                        className={`reg-form-input ${
+                          formErrors.phone ? "has-error" : ""
+                        }`}
                         placeholder="+91 98765 43210"
                         value={formData.phone}
                         onChange={(e) => {
                           setFormData((p) => ({ ...p, phone: e.target.value }));
                           setFormErrors((p) => ({ ...p, phone: "" }));
                         }}
+                        disabled={submitting}
                       />
                       {formErrors.phone && (
-                        <span className="pub-err-msg">{formErrors.phone}</span>
+                        <span className="reg-field-error-msg">
+                          {formErrors.phone}
+                        </span>
                       )}
                     </div>
                   )}
@@ -790,24 +1407,31 @@ export default function RegisterEvent() {
                       : [];
 
                     return (
-                      <div key={q.id || q.label} className="pub-form-group">
-                        <label htmlFor={qKey}>
-                          {q.label} {q.required && <span className="req">*</span>}
+                      <div key={q.id || q.label} className="reg-form-group">
+                        <label htmlFor={qKey} className="reg-form-label">
+                          {q.label}{" "}
+                          {q.required && <span className="reg-required">*</span>}
                         </label>
 
                         {q.type === "select" ? (
                           <select
                             id={qKey}
-                            className={`pub-select ${formErrors[qKey] ? "has-error" : ""}`}
+                            className={`reg-form-select ${
+                              formErrors[qKey] ? "has-error" : ""
+                            }`}
                             value={currentVal}
                             onChange={(e) => {
                               const val = e.target.value;
                               setFormData((p) => ({
                                 ...p,
-                                customAnswers: { ...p.customAnswers, [q.label]: val },
+                                customAnswers: {
+                                  ...p.customAnswers,
+                                  [q.label]: val,
+                                },
                               }));
                               setFormErrors((p) => ({ ...p, [qKey]: "" }));
                             }}
+                            disabled={submitting}
                           >
                             <option value="">Select an option</option>
                             {opts.map((opt) => (
@@ -820,48 +1444,63 @@ export default function RegisterEvent() {
                           <textarea
                             id={qKey}
                             rows={3}
-                            className={`pub-input ${formErrors[qKey] ? "has-error" : ""}`}
+                            className={`reg-form-textarea ${
+                              formErrors[qKey] ? "has-error" : ""
+                            }`}
                             placeholder="Type your response..."
                             value={currentVal}
                             onChange={(e) => {
                               const val = e.target.value;
                               setFormData((p) => ({
                                 ...p,
-                                customAnswers: { ...p.customAnswers, [q.label]: val },
+                                customAnswers: {
+                                  ...p.customAnswers,
+                                  [q.label]: val,
+                                },
                               }));
                               setFormErrors((p) => ({ ...p, [qKey]: "" }));
                             }}
+                            disabled={submitting}
                           />
                         ) : (
                           <input
                             id={qKey}
                             type="text"
-                            className={`pub-input ${formErrors[qKey] ? "has-error" : ""}`}
+                            className={`reg-form-input ${
+                              formErrors[qKey] ? "has-error" : ""
+                            }`}
                             placeholder="Your answer"
                             value={currentVal}
                             onChange={(e) => {
                               const val = e.target.value;
                               setFormData((p) => ({
                                 ...p,
-                                customAnswers: { ...p.customAnswers, [q.label]: val },
+                                customAnswers: {
+                                  ...p.customAnswers,
+                                  [q.label]: val,
+                                },
                               }));
                               setFormErrors((p) => ({ ...p, [qKey]: "" }));
                             }}
+                            disabled={submitting}
                           />
                         )}
 
                         {formErrors[qKey] && (
-                          <span className="pub-err-msg">{formErrors[qKey]}</span>
+                          <span className="reg-field-error-msg">
+                            {formErrors[qKey]}
+                          </span>
                         )}
                       </div>
                     );
                   })}
                 </div>
 
-                <div className="pub-modal-footer">
+                {/* Modal Footer Actions */}
+                <div className="reg-modal-footer">
                   <button
                     type="button"
-                    className="pub-btn-cancel"
+                    className="reg-modal-btn-cancel"
                     onClick={closeRegistrationModal}
                     disabled={submitting}
                   >
@@ -869,7 +1508,7 @@ export default function RegisterEvent() {
                   </button>
                   <button
                     type="submit"
-                    className="pub-btn-submit"
+                    className="reg-modal-btn-submit"
                     disabled={submitting}
                   >
                     {submitting ? "Registering..." : "Confirm & Register"}
@@ -880,6 +1519,6 @@ export default function RegisterEvent() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
