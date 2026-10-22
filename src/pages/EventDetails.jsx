@@ -7,6 +7,7 @@ import { normalizeEvent } from "../utils/eventNormalizer.js";
 import EventStatistics from "../components/EventStatistics.jsx";
 import EventReviews from "../components/reviews/EventReviews.jsx";
 import EventCard from "../components/EventCard.jsx";
+import EventCountdown from "../components/EventCountdown.jsx";
 import EventSchema from "../components/seo/schemas/EventSchema.jsx";
 import BreadcrumbSchema from "../components/seo/schemas/BreadcrumbSchema.jsx";
 import "./EventDetails.css";
@@ -260,6 +261,17 @@ export default function EventDetails() {
                     📍 {[event.venue, event.location].filter(Boolean).join(", ")}
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* Live Event Countdown */}
+            {event.countdownEnabled && (event.countdownTarget || event.eventStartDate) && !isCompleted && (
+              <div style={{ marginTop: 22, marginBottom: 12 }}>
+                <EventCountdown
+                  targetDate={event.countdownTarget || event.eventStartDate}
+                  title="Event Countdown"
+                  variant="hero"
+                />
               </div>
             )}
 

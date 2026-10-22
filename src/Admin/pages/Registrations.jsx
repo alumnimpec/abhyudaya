@@ -181,6 +181,8 @@ export default function Registrations() {
     coordinatorEmail: "",
     coordinatorPhone: "",
     banner: "",
+    countdownEnabled: false,
+    countdownTarget: "",
     formFields: {
       collegeEmail: { enabled: true, required: false },
       rollNumber: { enabled: true, required: false },
@@ -391,6 +393,8 @@ export default function Registrations() {
       coordinatorEmail: "",
       coordinatorPhone: "",
       banner: "",
+      countdownEnabled: false,
+      countdownTarget: "",
       formFields: {
         collegeEmail: { enabled: true, required: false },
         rollNumber: { enabled: true, required: false },
@@ -428,6 +432,8 @@ export default function Registrations() {
       coordinatorEmail: event.coordinatorEmail || "",
       coordinatorPhone: event.coordinatorPhone || "",
       banner: event.banner || event.image || "",
+      countdownEnabled: Boolean(event.countdownEnabled),
+      countdownTarget: event.countdownTarget || event.eventStartDate || "",
       formFields: event.formFields || {
         collegeEmail: { enabled: true, required: false },
         rollNumber: { enabled: true, required: false },
@@ -463,6 +469,10 @@ export default function Registrations() {
         maxRegistrations: eventFormData.maxRegistrations
           ? Number(eventFormData.maxRegistrations)
           : null,
+        countdownEnabled: Boolean(eventFormData.countdownEnabled),
+        countdownTarget: eventFormData.countdownEnabled
+          ? (eventFormData.countdownTarget || eventFormData.eventStartDate || "")
+          : "",
       };
 
       if (editingEvent) {
@@ -1384,9 +1394,58 @@ export default function Registrations() {
                   </div>
                 </div>
 
-                {/* 4. Coordinator Contact Information */}
+                {/* 4. Live Event Countdown Timer */}
                 <div className="reg-form-section">
-                  <h3 className="reg-form-section-title">4. Coordinator Contact Information</h3>
+                  <h3 className="reg-form-section-title">4. Event Countdown Timer</h3>
+                  <p className="reg-section-hint">
+                    Display an animated live countdown clock on the public website for this event.
+                  </p>
+
+                  <div className="reg-form-field full-width" style={{ marginBottom: 14 }}>
+                    <label className="reg-checkbox-label" style={{ padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 8, background: eventFormData.countdownEnabled ? "#f0fdf4" : "transparent" }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(eventFormData.countdownEnabled)}
+                        onChange={(e) =>
+                          setEventFormData((p) => ({
+                            ...p,
+                            countdownEnabled: e.target.checked,
+                            countdownTarget: e.target.checked && !p.countdownTarget ? p.eventStartDate : p.countdownTarget,
+                          }))
+                        }
+                      />
+                      <span>
+                        <strong>{eventFormData.countdownEnabled ? "✅ Live Event Countdown Enabled" : "Enable Live Event Countdown"}</strong>
+                        <small style={{ display: "block", color: "#64748b", marginTop: 2 }}>
+                          Displays Days, Hours, Minutes, and Seconds counting down on the public site.
+                        </small>
+                      </span>
+                    </label>
+                  </div>
+
+                  {eventFormData.countdownEnabled && (
+                    <div className="reg-form-grid-2">
+                      <div className="reg-form-field full-width">
+                        <label>Countdown Target Date &amp; Time (Defaults to Event Start Date)</label>
+                        <input
+                          type="datetime-local"
+                          className="reg-input-field"
+                          value={eventFormData.countdownTarget || eventFormData.eventStartDate || ""}
+                          onChange={(e) =>
+                            setEventFormData((p) => ({ ...p, countdownTarget: e.target.value }))
+                          }
+                        />
+                        <span style={{ fontSize: 12, color: "#64748b", marginTop: 4, display: "block" }}>
+                          Leave matching Event Start Date, or choose a custom target deadline.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Coordinator Contact Information */}
+                <div className="reg-form-section">
+                  <h3 className="reg-form-section-title">5. Coordinator Contact Information</h3>
                   <div className="reg-form-grid-3">
                     <div className="reg-form-field">
                       <label>Coordinator Name</label>

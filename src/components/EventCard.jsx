@@ -2,6 +2,7 @@ import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { normalizeEvent } from "../utils/eventNormalizer";
 import EventStatistics from "./EventStatistics";
+import EventCountdown from "./EventCountdown";
 
 function EventCard({ event: rawEvent, reverse }) {
   const event = useMemo(() => normalizeEvent(rawEvent), [rawEvent]);
@@ -46,6 +47,17 @@ function EventCard({ event: rawEvent, reverse }) {
 
         {/* Dynamic Statistics Component */}
         <EventStatistics stats={event.statistics} layout="compact" />
+
+        {/* Live Countdown Timer (if enabled) */}
+        {event.countdownEnabled && (event.countdownTarget || event.eventStartDate) && (
+          <div style={{ marginBottom: 16 }}>
+            <EventCountdown
+              targetDate={event.countdownTarget || event.eventStartDate}
+              title="Event Starts In"
+              variant="compact"
+            />
+          </div>
+        )}
 
         {ctaLink.startsWith("http") ? (
           <a

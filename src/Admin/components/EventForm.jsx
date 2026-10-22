@@ -132,6 +132,13 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
   );
   const [registrationOpen, setRegistrationOpen] = useState(Boolean(initialData?.registrationOpen));
 
+  /* ── Countdown Timer Settings ── */
+  const [countdownEnabled, setCountdownEnabled] = useState(Boolean(initialData?.countdownEnabled));
+  const [countdownTarget, setCountdownTarget]   = useState(initialData?.countdownTarget || initialData?.eventStartDate || "");
+  const [useCustomCountdownTarget, setUseCustomCountdownTarget] = useState(
+    Boolean(initialData?.countdownTarget && initialData?.countdownTarget !== initialData?.eventStartDate)
+  );
+
   /* ── Participant Form Fields Configuration ── */
   const [formFields, setFormFields] = useState(
     initialData?.formFields || {
@@ -360,12 +367,18 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
       isPaid:      isPaid,
       feeAmount:   isPaid ? (Number.isFinite(Number(feeAmount)) ? Number(feeAmount) : 0) : 0,
       currency:    "INR",
+      // Countdown Timer Settings
+      countdownEnabled: Boolean(countdownEnabled),
+      countdownTarget: countdownEnabled
+        ? (useCustomCountdownTarget && countdownTarget ? countdownTarget : (eventStartDate || countdownTarget || ""))
+        : "",
     };
   }, [
     title, derivedSlug, category, tagline, shortDesc, longDesc,
     venue, location, meetingLink, organizer, coordinatorName, coordinatorEmail, coordinatorPhone,
     eventStartDate, eventEndDate, regStartDate, regDeadline, registrationOpen,
     maxRegistrations, formFields, isPaid, feeAmount,
+    countdownEnabled, countdownTarget, useCustomCountdownTarget,
     bannerUrl, thumbUrl, stats, highlights, speakers,
     badgeText, badgeIcon, ctaText, ctaLink, featured,
   ]);
@@ -735,7 +748,81 @@ export default function EventForm({ initialData, onSubmit, saving, pageTitle, pa
             )}
           </div>
 
-          {/* ── 1c. Participant Form Fields Configuration ── */}
+          {/* ── 1c. Event Countdown Timer ── */}
+          <div className="ae-card">
+            <h2 className="ae-card-title">
+              <span className="ae-card-icon">⏱️</span>
+              Event Countdown Timer
+            </h2>
+            <p style={{ fontSize: 13, color: "#64748b", marginBottom: 18 }}>
+              Display a live dynamic countdown (Days, Hours, Minutes, Seconds) on public event pages.
+            </p>
+
+            <label className="ae-field" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 10, marginBottom: 16, cursor: "pointer", background: countdownEnabled ? "#f0fdf4" : "#ffffff" }}>
+              <input
+                type="checkbox"
+                checked={countdownEnabled}
+                onChange={(e) => {
+                  setCountdownEnabled(e.target.checked);
+                  if (e.target.checked && !countdownTarget) {
+                    setCountdownTarget(eventStartDate || "");
+                  }
+                }}
+              />
+              <span>
+                <strong>{countdownEnabled ? "✅ Live Event Countdown Enabled" : "Enable Event Countdown"}</strong>
+                <small style={{ display: "block", color: "#64748b", marginTop: 3 }}>
+                  When enabled, visitors will see a live ticker counting down to the event start or milestone.
+                </small>
+              </span>
+            </label>
+
+            {countdownEnabled && (
+              <div style={{ padding: "14px 16px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 20, fontSize: 13, fontWeight: 500 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="radio"
+                      name="countdownTargetType"
+                      checked={!useCustomCountdownTarget}
+                      onChange={() => {
+                        setUseCustomCountdownTarget(false);
+                        if (eventStartDate) setCountdownTarget(eventStartDate);
+                      }}
+                    />
+                    <span>Target Event Start Date ({eventStartDate ? new Date(eventStartDate).toLocaleString() : "Not set yet"})</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="radio"
+                      name="countdownTargetType"
+                      checked={useCustomCountdownTarget}
+                      onChange={() => setUseCustomCountdownTarget(true)}
+                    />
+                    <span>Custom Countdown Target Date &amp; Time</span>
+                  </label>
+                </div>
+
+                {useCustomCountdownTarget && (
+                  <div className="ae-field" style={{ marginTop: 4 }}>
+                    <label className="ae-label" htmlFor="evt-countdown-target">Custom Countdown Target Date &amp; Time</label>
+                    <input
+                      id="evt-countdown-target"
+                      type="datetime-local"
+                      className="ae-input"
+                      value={countdownTarget}
+                      onChange={(e) => setCountdownTarget(e.target.value)}
+                    />
+                    <small style={{ color: "#64748b", fontSize: 12, display: "block", marginTop: 4 }}>
+                      Set a custom target time (e.g. registration cutoff, kickoff ceremony, or challenge deadline).
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── 1d. Participant Form Fields Configuration ── */}
           <div className="ae-card">
             <h2 className="ae-card-title">
               <span className="ae-card-icon">📋</span>

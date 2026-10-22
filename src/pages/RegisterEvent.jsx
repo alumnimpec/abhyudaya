@@ -12,15 +12,16 @@ import {
   FiCheck,
   FiX,
   FiArrowRight,
-  FiArrowDown,
   FiRefreshCw,
   FiSearch,
+  FiStar,
 } from "react-icons/fi";
 import { getEventsPage } from "../Firebase/eventService.js";
 import {
   countRegistrations,
   createRegistration,
 } from "../Firebase/registrationService.js";
+import EventCountdown from "../components/EventCountdown.jsx";
 import "./RegisterEvent.css";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -47,6 +48,55 @@ function formatDateTime(dateStr) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/**
+ * Strict eligibility check for the /register page:
+ * - Only events with status "Published"
+ * - registrationOpen === true
+ * - Upcoming start/end date (no past/expired events)
+ * - Registration deadline has not passed
+ * - Registration start date has arrived (if specified)
+ * - Capacity not exceeded
+ */
+export function isEventEligibleForRegistration(event, count = 0) {
+  if (!event || typeof event !== "object") return false;
+
+  // 1. Must be published
+  if (event.status !== "Published") return false;
+
+  // 2. Must be explicitly open
+  if (event.registrationOpen !== true) return false;
+
+  const now = new Date();
+
+  // 3. Must be an upcoming event (exclude past / concluded events)
+  if (event.eventEndDate) {
+    const end = new Date(event.eventEndDate);
+    if (!isNaN(end.getTime()) && now > end) return false;
+  } else if (event.eventStartDate) {
+    const start = new Date(event.eventStartDate);
+    if (!isNaN(start.getTime()) && now > start) return false;
+  }
+
+  // 4. Registration deadline must not have passed
+  if (event.registrationDeadline) {
+    const deadline = new Date(event.registrationDeadline);
+    if (!isNaN(deadline.getTime()) && now > deadline) return false;
+  }
+
+  // 5. Registration start date must have arrived (if defined)
+  if (event.registrationStartDate) {
+    const regStart = new Date(event.registrationStartDate);
+    if (!isNaN(regStart.getTime()) && now < regStart) return false;
+  }
+
+  // 6. Must have capacity remaining
+  if (event.maxRegistrations && count >= Number(event.maxRegistrations)) {
+    return false;
+  }
+
+  return true;
 }
 
 function getEventRegStatus(event, count) {
@@ -86,12 +136,11 @@ function getEventRegStatus(event, count) {
     return { status: "FULL", label: "Fully Booked", canRegister: false };
   }
 
-  return { status: "OPEN", label: "Register Now", canRegister: true };
+  return { status: "OPEN", label: "Registration Open", canRegister: true };
 }
 
 function matchesCategory(event, category) {
   if (category === "All Events") return true;
-
   const target = category.toLowerCase();
   const cat = String(event.category || "").toLowerCase();
   const subtitle = String(event.subtitle || event.kind || "").toLowerCase();
@@ -100,74 +149,33 @@ function matchesCategory(event, category) {
   const text = `${cat} ${subtitle} ${title} ${desc}`;
 
   if (target === "technical") {
-    return (
-      cat === "technical" ||
-      text.includes("tech") ||
-      text.includes("coding") ||
-      text.includes("software") ||
-      text.includes("ai") ||
-      text.includes("web") ||
-      text.includes("robotics")
-    );
+    return cat === "technical" || text.includes("tech") || text.includes("coding") ||
+      text.includes("software") || text.includes("ai") || text.includes("web") ||
+      text.includes("robotics");
   }
   if (target === "workshops") {
-    return (
-      cat === "workshop" ||
-      cat === "workshops" ||
-      text.includes("workshop") ||
-      text.includes("hands-on") ||
-      text.includes("bootcamp") ||
-      text.includes("masterclass") ||
-      text.includes("training")
-    );
+    return cat === "workshop" || cat === "workshops" || text.includes("workshop") ||
+      text.includes("hands-on") || text.includes("bootcamp") || text.includes("masterclass") ||
+      text.includes("training");
   }
   if (target === "literary") {
-    return (
-      cat === "literary" ||
-      text.includes("literary") ||
-      text.includes("debate") ||
-      text.includes("quiz") ||
-      text.includes("mun") ||
-      text.includes("writing") ||
-      text.includes("speech") ||
-      text.includes("communicraft")
-    );
+    return cat === "literary" || text.includes("literary") || text.includes("debate") ||
+      text.includes("quiz") || text.includes("mun") || text.includes("writing") ||
+      text.includes("speech") || text.includes("communicraft");
   }
   if (target === "cultural") {
-    return (
-      cat === "cultural" ||
-      text.includes("cultural") ||
-      text.includes("fest") ||
-      text.includes("music") ||
-      text.includes("dance") ||
-      text.includes("drama") ||
-      text.includes("art") ||
-      text.includes("creative")
-    );
+    return cat === "cultural" || text.includes("cultural") || text.includes("fest") ||
+      text.includes("music") || text.includes("dance") || text.includes("drama") ||
+      text.includes("art") || text.includes("creative");
   }
   if (target === "competitions") {
-    return (
-      cat === "competition" ||
-      cat === "competitions" ||
-      text.includes("competition") ||
-      text.includes("contest") ||
-      text.includes("spardha") ||
-      text.includes("challenge") ||
-      text.includes("hackathon") ||
-      text.includes("quiztronix")
-    );
+    return cat === "competition" || cat === "competitions" || text.includes("competition") ||
+      text.includes("contest") || text.includes("spardha") || text.includes("challenge") ||
+      text.includes("hackathon") || text.includes("quiztronix");
   }
-
   return cat.includes(target) || text.includes(target);
 }
 
-// Status hierarchy priority:
-// 1: Closing Soon (Open & urgent)
-// 2: Open (Accepting registrations)
-// 3: Not Started (Upcoming, will open soon)
-// 4: Closed / Expired
-// 5: Fully Booked (Capacity reached)
-// 6: Other
 function getStatusPriority(statusInfo) {
   if (statusInfo.canRegister) {
     if (statusInfo.status === "CLOSING_SOON") return 1;
@@ -182,16 +190,34 @@ function getStatusPriority(statusInfo) {
 function compareEvents(a, b) {
   const pA = getStatusPriority(a.statusInfo);
   const pB = getStatusPriority(b.statusInfo);
-  if (pA !== pB) {
-    return pA - pB;
-  }
-  // Secondary sort: nearest upcoming event date first
+  if (pA !== pB) return pA - pB;
   const dateA = a.eventStartDate ? new Date(a.eventStartDate).getTime() : Infinity;
   const dateB = b.eventStartDate ? new Date(b.eventStartDate).getTime() : Infinity;
-  if (dateA !== dateB) {
-    return dateA - dateB;
-  }
+  if (dateA !== dateB) return dateA - dateB;
   return (a.title || "").localeCompare(b.title || "");
+}
+
+/* ── Resolve status badge class ── */
+function statusBadgeClass(status) {
+  if (status === "OPEN") return "open";
+  if (status === "CLOSING_SOON") return "closing-soon";
+  if (status === "FULL") return "full";
+  if (status === "CLOSED" || status === "EXPIRED" || status === "UNPUBLISHED") return "closed";
+  if (status === "NOT_STARTED") return "upcoming";
+  return "closed";
+}
+
+/* ── Fallback SVG emblem (star/award icon) ── */
+function FallbackEmblem() {
+  return (
+    <svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M17 3L20.5 12.5H31L22.5 18.5L25.5 28L17 22L8.5 28L11.5 18.5L3 12.5H13.5L17 3Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export default function RegisterEvent() {
@@ -200,11 +226,9 @@ export default function RegisterEvent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  /* ── Filter and Search State ── */
   const [selectedCategory, setSelectedCategory] = useState("All Events");
   const [searchQuery, setSearchQuery] = useState("");
 
-  /* ── Registration Modal State ── */
   const [modalEvent, setModalEvent] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -222,7 +246,6 @@ export default function RegisterEvent() {
   const [registrationResult, setRegistrationResult] = useState(null);
   const [copiedId, setCopiedId] = useState(false);
 
-  /* ── Load Published Events and Counts ── */
   const loadEventsData = useCallback(async () => {
     try {
       setLoading(true);
@@ -231,7 +254,6 @@ export default function RegisterEvent() {
       const publishedEvents = res.events || [];
       setEvents(publishedEvents);
 
-      // Fetch registration count for each event
       const counts = {};
       await Promise.all(
         publishedEvents.map(async (ev) => {
@@ -251,95 +273,52 @@ export default function RegisterEvent() {
     }
   }, []);
 
-  useEffect(() => {
-    loadEventsData();
-  }, [loadEventsData]);
+  useEffect(() => { loadEventsData(); }, [loadEventsData]);
 
-  // Handle escape key to close modal
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "Escape" && modalEvent) {
-        closeRegistrationModal();
-      }
+      if (e.key === "Escape" && modalEvent) closeRegistrationModal();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [modalEvent]);
 
-  /* ── Events with Status Computations ── */
-  const eventsWithStatus = useMemo(() => {
-    return events.map((ev) => {
-      const count = regCounts[ev.id] || 0;
-      const statusInfo = getEventRegStatus(ev, count);
-      const maxLimit = ev.maxRegistrations ? Number(ev.maxRegistrations) : null;
-      const remainingSeats = maxLimit !== null ? Math.max(0, maxLimit - count) : null;
-      const percentFilled = maxLimit ? Math.min(100, Math.round((count / maxLimit) * 100)) : 0;
-
-      return {
-        ...ev,
-        count,
-        statusInfo,
-        maxLimit,
-        remainingSeats,
-        percentFilled,
-      };
-    });
+  const eligibleEvents = useMemo(() => {
+    return events
+      .filter((ev) => isEventEligibleForRegistration(ev, regCounts[ev.id] || 0))
+      .map((ev) => {
+        const count = regCounts[ev.id] || 0;
+        const statusInfo = getEventRegStatus(ev, count);
+        const maxLimit = ev.maxRegistrations ? Number(ev.maxRegistrations) : null;
+        const remainingSeats = maxLimit !== null ? Math.max(0, maxLimit - count) : null;
+        const percentFilled = maxLimit ? Math.min(100, Math.round((count / maxLimit) * 100)) : 0;
+        return { ...ev, count, statusInfo, maxLimit, remainingSeats, percentFilled };
+      });
   }, [events, regCounts]);
 
-  /* ── Global Open / Upcoming Events Check ── */
-  const hasOpenOrUpcomingEvents = useMemo(() => {
-    return eventsWithStatus.some(
-      (e) => e.statusInfo.canRegister || e.statusInfo.status === "NOT_STARTED"
-    );
-  }, [eventsWithStatus]);
+  const hasEligibleEvents = eligibleEvents.length > 0;
 
-  /* ── Filtered and Strictly Prioritized Events ── */
   const filteredEvents = useMemo(() => {
-    const matches = eventsWithStatus.filter((ev) => {
-      const matchesCat = matchesCategory(ev, selectedCategory);
-      if (!matchesCat) return false;
-
+    const matches = eligibleEvents.filter((ev) => {
+      if (!matchesCategory(ev, selectedCategory)) return false;
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
-      const title = String(ev.title || "").toLowerCase();
-      const desc = String(ev.description || ev.shortDescription || ev.tagline || "").toLowerCase();
-      const venue = String(ev.venue || ev.location || "").toLowerCase();
-      const category = String(ev.category || ev.subtitle || "").toLowerCase();
-
       return (
-        title.includes(q) ||
-        desc.includes(q) ||
-        venue.includes(q) ||
-        category.includes(q)
+        String(ev.title || "").toLowerCase().includes(q) ||
+        String(ev.description || ev.shortDescription || ev.tagline || "").toLowerCase().includes(q) ||
+        String(ev.venue || ev.location || "").toLowerCase().includes(q) ||
+        String(ev.category || ev.subtitle || "").toLowerCase().includes(q)
       );
     });
-
-    // Enforce priority ordering: Open first -> Upcoming next -> Closed -> Fully booked
     return [...matches].sort(compareEvents);
-  }, [eventsWithStatus, selectedCategory, searchQuery]);
+  }, [eligibleEvents, selectedCategory, searchQuery]);
 
-  /* ── Segregate Open Events for Prominent Featured Section ── */
-  const openFilteredEvents = useMemo(() => {
-    return filteredEvents.filter((e) => e.statusInfo.canRegister);
-  }, [filteredEvents]);
+  const featuredEvent = filteredEvents[0] || null;
+  const remainingEvents = filteredEvents.slice(1);
 
-  const remainingFilteredEvents = useMemo(() => {
-    return filteredEvents.filter((e) => !e.statusInfo.canRegister);
-  }, [filteredEvents]);
-
-  /* ── Registration Modal Actions ── */
   const openRegistrationModal = (ev) => {
     setModalEvent(ev);
-    setFormData({
-      name: "",
-      email: "",
-      collegeEmail: "",
-      rollNumber: "",
-      department: "",
-      year: "",
-      phone: "",
-      customAnswers: {},
-    });
+    setFormData({ name: "", email: "", collegeEmail: "", rollNumber: "", department: "", year: "", phone: "", customAnswers: {} });
     setFormErrors({});
     setSubmitError("");
     setRegistrationResult(null);
@@ -352,59 +331,34 @@ export default function RegisterEvent() {
     setSubmitError("");
   };
 
-  /* ── Form Validation ── */
   const validateForm = () => {
     const errs = {};
     const ff = modalEvent?.formFields || {};
 
-    if (!formData.name.trim()) {
-      errs.name = "Full name is required.";
-    }
-
-    if (!formData.email.trim()) {
-      errs.email = "Email address is required.";
-    } else if (!EMAIL_REGEX.test(formData.email.trim())) {
-      errs.email = "Please enter a valid email address.";
-    }
+    if (!formData.name.trim()) errs.name = "Full name is required.";
+    if (!formData.email.trim()) errs.email = "Email address is required.";
+    else if (!EMAIL_REGEX.test(formData.email.trim())) errs.email = "Please enter a valid email address.";
 
     if (ff.collegeEmail?.enabled !== false && ff.collegeEmail?.required) {
-      if (!formData.collegeEmail.trim()) {
-        errs.collegeEmail = "College email is required.";
-      } else if (!EMAIL_REGEX.test(formData.collegeEmail.trim())) {
-        errs.collegeEmail = "Please enter a valid college email address.";
-      }
+      if (!formData.collegeEmail.trim()) errs.collegeEmail = "College email is required.";
+      else if (!EMAIL_REGEX.test(formData.collegeEmail.trim())) errs.collegeEmail = "Please enter a valid college email address.";
     }
-
     if (ff.rollNumber?.enabled !== false && ff.rollNumber?.required) {
-      if (!formData.rollNumber.trim()) {
-        errs.rollNumber = "Roll number / Student ID is required.";
-      }
+      if (!formData.rollNumber.trim()) errs.rollNumber = "Roll number / Student ID is required.";
     }
-
     if (ff.departmentYear?.enabled !== false && ff.departmentYear?.required) {
-      if (!formData.department.trim()) {
-        errs.department = "Department / Branch is required.";
-      }
-      if (!formData.year.trim()) {
-        errs.year = "Year / Semester is required.";
-      }
+      if (!formData.department.trim()) errs.department = "Department / Branch is required.";
+      if (!formData.year.trim()) errs.year = "Year / Semester is required.";
     }
-
     if (ff.phone?.enabled !== false && ff.phone?.required) {
-      if (!formData.phone.trim()) {
-        errs.phone = "Phone number is required.";
-      } else if (!PHONE_REGEX.test(formData.phone.trim())) {
-        errs.phone = "Please enter a valid phone number.";
-      }
+      if (!formData.phone.trim()) errs.phone = "Phone number is required.";
+      else if (!PHONE_REGEX.test(formData.phone.trim())) errs.phone = "Please enter a valid phone number.";
     }
 
-    const customQuestions = ff.customQuestions || [];
-    customQuestions.forEach((q) => {
+    (ff.customQuestions || []).forEach((q) => {
       if (q.required) {
         const val = (formData.customAnswers[q.label] || "").trim();
-        if (!val) {
-          errs[`q_${q.id || q.label}`] = `"${q.label}" is required.`;
-        }
+        if (!val) errs[`q_${q.id || q.label}`] = `"${q.label}" is required.`;
       }
     });
 
@@ -412,11 +366,9 @@ export default function RegisterEvent() {
     return Object.keys(errs).length === 0;
   };
 
-  /* ── Submit Registration ── */
   const handleSubmitRegistration = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-
     setSubmitting(true);
     setSubmitError("");
 
@@ -426,9 +378,7 @@ export default function RegisterEvent() {
         eventTitle: modalEvent.title,
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
-        collegeEmail:
-          formData.collegeEmail.trim().toLowerCase() ||
-          formData.email.trim().toLowerCase(),
+        collegeEmail: formData.collegeEmail.trim().toLowerCase() || formData.email.trim().toLowerCase(),
         rollNumber: formData.rollNumber.trim(),
         department: formData.department.trim(),
         year: formData.year.trim(),
@@ -440,13 +390,7 @@ export default function RegisterEvent() {
       };
 
       const result = await createRegistration(payload);
-
-      // Increment count locally so UI updates in real-time
-      setRegCounts((prev) => ({
-        ...prev,
-        [modalEvent.id]: (prev[modalEvent.id] || 0) + 1,
-      }));
-
+      setRegCounts((prev) => ({ ...prev, [modalEvent.id]: (prev[modalEvent.id] || 0) + 1 }));
       setRegistrationResult({
         registrationId: result.registrationId,
         id: result.id,
@@ -457,9 +401,7 @@ export default function RegisterEvent() {
       });
     } catch (err) {
       console.error("Registration error:", err);
-      setSubmitError(
-        err.message || "Unable to complete registration. Please try again."
-      );
+      setSubmitError(err.message || "Unable to complete registration. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -474,94 +416,77 @@ export default function RegisterEvent() {
   };
 
   return (
-    <div className="reg-editorial-page">
+    <div className="dlux-page">
       <Helmet>
         <title>Event Registrations | Abhyudaya Club — MPEC Kanpur</title>
         <meta
           name="description"
-          content="Discover inspiring conversations, technical workshops, flagship festivals, and competitions at Abhyudaya Club MPEC. Secure your seat today."
+          content="Discover upcoming competitions, technical events, and campus experiences at Abhyudaya Club MPEC. Find your next opportunity and reserve your place."
         />
         <meta name="robots" content="index,follow" />
       </Helmet>
 
       {/* ============================================================
-          1. EDITORIAL HERO SECTION
+          PREMIUM HERO
          ============================================================ */}
-      <section className="reg-editorial-hero" aria-label="Registration Introduction">
-        <div className="reg-hero-bg-overlay" aria-hidden="true" />
-        <div className="reg-hero-container">
-          {/* Eyebrow */}
-          <div className="reg-hero-eyebrow-wrap">
-            <span className="reg-hero-sparkle" aria-hidden="true">✦</span>
-            <span className="reg-hero-eyebrow">ABHYUDAYA PRESENTS</span>
-            <span className="reg-hero-sparkle" aria-hidden="true">✦</span>
+      <section className="dlux-hero" aria-label="Registration page header">
+        <div className="dlux-hero-inner">
+          <div className="dlux-hero-eyebrow">
+            <span className="dlux-hero-eyebrow-dot" aria-hidden="true" />
+            ABHYUDAYA CLUB • MPEC KANPUR
+            <span className="dlux-hero-eyebrow-dot" aria-hidden="true" />
           </div>
 
-          {/* Main Heading */}
-          <h1 className="reg-hero-heading">
-            Find Your Next <span className="reg-hero-heading-italic">Experience.</span>
+          <h1 className="dlux-hero-h1">
+            Experiences Worth{" "}
+            <span className="dlux-hero-h1-italic">Being Part Of.</span>
           </h1>
 
-          {/* Subtle Gold Divider */}
-          <div className="reg-hero-divider" aria-hidden="true">
-            <span className="reg-hero-divider-line" />
-            <span className="reg-hero-divider-diamond">◆</span>
-            <span className="reg-hero-divider-line" />
+          <div className="dlux-hero-rule" aria-hidden="true">
+            <span className="dlux-hero-rule-line" />
+            <span className="dlux-hero-rule-gem">◆◆◆</span>
+            <span className="dlux-hero-rule-line" />
           </div>
 
-          {/* Description */}
-          <p className="reg-hero-description">
-            From inspiring conversations to hands-on workshops, discover the
-            experiences that bring our campus together.
+          <p className="dlux-hero-desc">
+            Discover upcoming competitions, technical events, and campus experiences.
+            Find your next opportunity and reserve your place.
           </p>
-
-          {/* Hero Actions */}
-          <div className="reg-hero-actions">
-            <a href="#events-hub" className="reg-hero-btn reg-hero-btn-primary">
-              <span>Explore Events</span>
-              <FiArrowDown className="reg-btn-icon-bounce" />
-            </a>
-            <Link to="/events" className="reg-hero-btn reg-hero-btn-ghost">
-              <span>Past Highlights</span>
-              <FiArrowRight />
-            </Link>
-          </div>
         </div>
       </section>
 
       {/* ============================================================
-          2. UPCOMING EXPERIENCES HUB & TOOLBAR
+          MAIN CONTENT
          ============================================================ */}
-      <main id="events-hub" className="reg-editorial-main">
-        <div className="reg-main-container">
-          {/* Search & Category Filter Toolbar */}
-          <div className="reg-toolbar">
-            {/* Category Filter Pills */}
-            <div className="reg-filter-scroll" role="tablist" aria-label="Event Categories">
+      <main id="events-hub" className="dlux-main">
+
+        {/* ── TOOLBAR ── */}
+        {!loading && !error && hasEligibleEvents && (
+          <div className="dlux-toolbar">
+            <div className="dlux-filter-row" role="tablist" aria-label="Event categories">
               {CATEGORIES.map((cat) => {
-                const isSelected = selectedCategory === cat;
+                const isActive = selectedCategory === cat;
                 return (
                   <button
                     key={cat}
                     type="button"
                     role="tab"
-                    aria-selected={isSelected}
-                    className={`reg-filter-pill ${isSelected ? "is-active" : ""}`}
+                    aria-selected={isActive}
+                    className={`dlux-filter-pill${isActive ? " is-active" : ""}`}
                     onClick={() => setSelectedCategory(cat)}
                   >
-                    <span>{cat}</span>
+                    {cat}
                   </button>
                 );
               })}
             </div>
 
-            {/* Search Input Box */}
-            <div className="reg-search-box">
-              <FiSearch className="reg-search-icon" aria-hidden="true" />
+            <div className="dlux-search-wrap">
+              <FiSearch className="dlux-search-icon" aria-hidden="true" />
               <input
                 type="text"
-                className="reg-search-input"
-                placeholder="Search by title, topic, or venue..."
+                className="dlux-search-input"
+                placeholder="Search events..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Search events"
@@ -569,499 +494,422 @@ export default function RegisterEvent() {
               {searchQuery && (
                 <button
                   type="button"
-                  className="reg-search-clear"
+                  className="dlux-search-clear"
                   onClick={() => setSearchQuery("")}
-                  aria-label="Clear search query"
+                  aria-label="Clear search"
                 >
                   <FiX />
                 </button>
               )}
             </div>
           </div>
+        )}
 
-          {/* ============================================================
-              3. CONTENT STATES & PRIORITY EVENT SECTIONS
-             ============================================================ */}
-          {loading ? (
-            /* Loading Skeletons */
-            <div className="reg-grid-skeleton" aria-label="Loading events">
-              {[1, 2, 3].map((n) => (
-                <div key={n} className="reg-card-skeleton">
-                  <div className="reg-skeleton-media" />
-                  <div className="reg-skeleton-body">
-                    <div className="reg-skeleton-line reg-skel-tag" />
-                    <div className="reg-skeleton-line reg-skel-title" />
-                    <div className="reg-skeleton-line reg-skel-desc" />
-                    <div className="reg-skeleton-line reg-skel-meta" />
-                    <div className="reg-skeleton-line reg-skel-btn" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            /* Error Card */
-            <div className="reg-editorial-empty-card" role="alert">
-              <div className="reg-empty-icon-wrap">
-                <FiAlertCircle className="reg-empty-icon text-amber" />
+        {/* ── CONTENT STATES ── */}
+
+        {loading ? (
+          /* Loading skeleton */
+          <div className="dlux-skeleton-grid" aria-label="Loading events">
+            <div className="dlux-skeleton-featured">
+              <div className="dlux-skeleton-img" />
+              <div className="dlux-skeleton-body">
+                <div className="dlux-skel-line dlux-skel-tag" />
+                <div className="dlux-skel-line dlux-skel-title" />
+                <div className="dlux-skel-line dlux-skel-title-2" />
+                <div className="dlux-skel-line dlux-skel-desc" />
+                <div className="dlux-skel-line dlux-skel-meta" />
+                <div className="dlux-skel-line dlux-skel-btn" />
               </div>
-              <h3 className="reg-empty-heading">Unable to Load Events</h3>
-              <p className="reg-empty-desc">{error}</p>
+            </div>
+          </div>
+
+        ) : error ? (
+          /* Error state */
+          <div className="dlux-error-card" role="alert">
+            <div className="dlux-error-icon-wrap">
+              <FiAlertCircle />
+            </div>
+            <h3 className="dlux-state-heading">Unable to Load Events</h3>
+            <p className="dlux-state-desc">{error}</p>
+            <button type="button" className="dlux-btn-utility" onClick={loadEventsData}>
+              <FiRefreshCw />
+              <span>Retry Connection</span>
+            </button>
+          </div>
+
+        ) : !hasEligibleEvents ? (
+          /* No registrations open */
+          <div className="dlux-empty-card" aria-label="No registrations available">
+            <div className="dlux-empty-emblem" aria-hidden="true">
+              <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="44" cy="44" r="43" stroke="rgba(232,181,71,0.18)" strokeWidth="1.5" />
+                <circle cx="44" cy="44" r="35" stroke="rgba(232,181,71,0.1)" strokeWidth="1" />
+                <path
+                  d="M44 20L48.5 33H63L51.5 41L56 54L44 46L32 54L36.5 41L25 33H39.5L44 20Z"
+                  stroke="#E8B547"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  fill="rgba(232,181,71,0.06)"
+                />
+                <circle cx="44" cy="68" r="3" fill="rgba(232,181,71,0.25)" />
+              </svg>
+            </div>
+            <h3 className="dlux-state-heading">The Next Experience Awaits.</h3>
+            <p className="dlux-state-desc">
+              There are no open registrations right now. Stay tuned for upcoming Abhyudaya events.
+            </p>
+            <div className="dlux-empty-actions">
+              <Link to="/events" className="dlux-btn-utility">
+                <span>Explore All Events</span>
+                <FiArrowRight />
+              </Link>
+            </div>
+          </div>
+
+        ) : filteredEvents.length === 0 ? (
+          /* Search / filter no results */
+          <div className="dlux-empty-card" role="status">
+            <div className="dlux-empty-emblem" aria-hidden="true">
+              <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="44" cy="44" r="43" stroke="rgba(232,181,71,0.12)" strokeWidth="1.5" />
+                <circle cx="38" cy="38" r="16" stroke="rgba(232,181,71,0.5)" strokeWidth="1.5" />
+                <path d="M50 50L62 62" stroke="rgba(232,181,71,0.5)" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h3 className="dlux-state-heading">No Matching Events</h3>
+            <p className="dlux-state-desc">
+              We couldn't find any events matching{" "}
+              {searchQuery ? <strong>"{searchQuery}"</strong> : "your filter"}{" "}
+              in <em>{selectedCategory}</em>.
+            </p>
+            <div className="dlux-empty-actions">
               <button
                 type="button"
-                className="reg-btn-editorial-gold"
-                onClick={loadEventsData}
+                className="dlux-btn-utility"
+                onClick={() => { setSelectedCategory("All Events"); setSearchQuery(""); }}
               >
-                <FiRefreshCw />
-                <span>Retry Connection</span>
+                Reset Filters
               </button>
             </div>
-          ) : !hasOpenOrUpcomingEvents && eventsWithStatus.length === 0 ? (
-            /* Polished Editorial Empty State (No Open Registrations) */
-            <div className="reg-editorial-empty-card" aria-label="No registrations available">
-              <div className="reg-calendar-illustration" aria-hidden="true">
-                <svg
-                  width="120"
-                  height="120"
-                  viewBox="0 0 120 120"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="reg-calendar-svg"
-                >
-                  <rect
-                    x="20"
-                    y="28"
-                    width="80"
-                    height="76"
-                    rx="14"
-                    fill="#10182D"
-                    fillOpacity="0.08"
-                    transform="translate(0, 4)"
-                  />
-                  <rect
-                    x="20"
-                    y="24"
-                    width="80"
-                    height="76"
-                    rx="14"
-                    fill="#FAF4E9"
-                    stroke="#10182D"
-                    strokeWidth="2.5"
-                  />
-                  <path
-                    d="M20 38C20 30.268 26.268 24 34 24H86C93.732 24 100 30.268 100 38V44H20V38Z"
-                    fill="#10182D"
-                  />
-                  <rect x="36" y="16" width="6" height="14" rx="3" fill="#E7B544" />
-                  <rect x="57" y="16" width="6" height="14" rx="3" fill="#E7B544" />
-                  <rect x="78" y="16" width="6" height="14" rx="3" fill="#E7B544" />
-                  <circle cx="38" cy="58" r="3.5" fill="#10182D" fillOpacity="0.3" />
-                  <circle cx="60" cy="58" r="3.5" fill="#10182D" fillOpacity="0.3" />
-                  <circle cx="82" cy="58" r="3.5" fill="#10182D" fillOpacity="0.3" />
-                  <circle cx="38" cy="74" r="3.5" fill="#10182D" fillOpacity="0.3" />
-                  <path
-                    d="M60 67L62.094 71.748L67.243 72.316L63.407 75.787L64.462 80.854L60 78.27L55.538 80.854L56.593 75.787L52.757 72.316L57.906 71.748L60 67Z"
-                    fill="#E7B544"
-                  />
-                  <circle cx="82" cy="74" r="3.5" fill="#10182D" fillOpacity="0.3" />
-                  <path
-                    d="M96 16L97.5 21L102.5 22.5L97.5 24L96 29L94.5 24L89.5 22.5L94.5 21L96 16Z"
-                    fill="#E7B544"
-                  />
-                </svg>
-              </div>
+          </div>
 
-              <h3 className="reg-empty-heading">Something Worth Looking Forward To</h3>
-              <p className="reg-empty-desc">
-                From technical deep-dives to vibrant cultural gatherings, our next
-                series of campus experiences is currently being curated. Check back
-                soon or browse our archive of celebrated past events.
-              </p>
+        ) : (
+          <>
+            {/* ============================================================
+                FEATURED DARK LUXURY CARD — First eligible event
+               ============================================================ */}
+            {featuredEvent && (() => {
+              const ev = featuredEvent;
+              const { statusInfo, maxLimit, remainingSeats, percentFilled } = ev;
+              const imgSrc = ev.banner || ev.image;
+              const badgeClass = statusBadgeClass(statusInfo.status);
+              const isUrgent = statusInfo.status === "CLOSING_SOON";
+              const fillClass = remainingSeats !== null && remainingSeats <= 10 ? "urgent" : "normal";
 
-              <div className="reg-empty-actions">
-                <Link to="/events" className="reg-btn-editorial-gold">
-                  <span>← Back to Events</span>
-                </Link>
-              </div>
-            </div>
-          ) : filteredEvents.length === 0 ? (
-            /* Search / Filter Yielded No Results */
-            <div className="reg-editorial-empty-card" role="status">
-              <span className="reg-empty-symbol">🔍</span>
-              <h3 className="reg-empty-heading">No Matching Experiences</h3>
-              <p className="reg-empty-desc">
-                We couldn't find any events matching{" "}
-                {searchQuery ? <strong>"{searchQuery}"</strong> : "your filter"}{" "}
-                in the <em>{selectedCategory}</em> category.
-              </p>
-              <button
-                type="button"
-                className="reg-btn-editorial-gold"
-                onClick={() => {
-                  setSelectedCategory("All Events");
-                  setSearchQuery("");
-                }}
-              >
-                <span>Reset All Filters</span>
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* ============================================================
-                  3A. FEATURED SECTION: "REGISTRATIONS OPEN NOW"
-                  Prominently displays every event currently accepting registrations
-                 ============================================================ */}
-              {openFilteredEvents.length > 0 && (
-                <section
-                  className="reg-featured-open-section"
-                  aria-labelledby="featured-open-heading"
-                >
-                  <div className="reg-featured-section-header">
-                    <div className="reg-live-eyebrow">
-                      <span className="reg-live-pulse-dot" aria-hidden="true" />
-                      <span>ACTIVE REGISTRATIONS</span>
+              return (
+                <div className="dlux-featured-wrap">
+                  <div className="dlux-section-header">
+                    <div className="dlux-live-badge">
+                      <span className="dlux-live-dot" aria-hidden="true" />
+                      <span>REGISTRATIONS OPEN NOW</span>
                     </div>
-                    <h2
-                      id="featured-open-heading"
-                      className="reg-featured-section-title"
-                    >
-                      Registrations Open Now
-                    </h2>
-                    <p className="reg-featured-section-subtitle">
+                    <h2 className="dlux-section-title">Registrations Open Now</h2>
+                    <p className="dlux-section-subtitle">
                       Your next experience is waiting. Explore events and secure your spot.
                     </p>
                   </div>
 
-                  <div
-                    className={`reg-featured-grid ${
-                      openFilteredEvents.length === 1 ? "single-featured" : ""
-                    }`}
+                  <article
+                    className="dlux-featured-card"
+                    aria-label={`Featured event: ${ev.title}`}
                   >
-                    {openFilteredEvents.map((event) => {
-                      const {
-                        statusInfo,
-                        maxLimit,
-                        remainingSeats,
-                        percentFilled,
-                      } = event;
-
-                      return (
-                        <article
-                          key={event.id}
-                          className="reg-featured-card"
-                          aria-label={`Featured open event: ${event.title}`}
-                        >
-                          {/* Large Media Banner */}
-                          <div className="reg-featured-media">
-                            {event.banner || event.image ? (
-                              <img
-                                src={event.banner || event.image}
-                                alt={event.title}
-                                className="reg-featured-img"
-                                loading="eager"
-                              />
-                            ) : (
-                              <div className="reg-featured-fallback-banner">
-                                <span className="reg-featured-fallback-icon">
-                                  {event.icon || "🏛️"}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Prominent High-Contrast Registration Open Badge */}
-                            <div className="reg-featured-badge-wrap">
-                              <span className="reg-featured-badge-open">
-                                <span className="reg-badge-glow-dot" aria-hidden="true" />
-                                <span>REGISTRATION OPEN</span>
-                              </span>
-                            </div>
-
-                            {/* Category Pill */}
-                            <span className="reg-featured-category-pill">
-                              {event.category || event.subtitle || "Featured Experience"}
-                            </span>
+                    {/* ── Image Panel ── */}
+                    <div className="dlux-featured-img-panel">
+                      {imgSrc ? (
+                        <>
+                          <img
+                            src={imgSrc}
+                            alt={ev.title}
+                            className="dlux-featured-img"
+                            loading="eager"
+                          />
+                          <div className="dlux-featured-img-scrim" aria-hidden="true" />
+                        </>
+                      ) : (
+                        <div className="dlux-featured-fallback" aria-hidden="true">
+                          <div className="dlux-featured-fallback-emblem">
+                            <FallbackEmblem />
                           </div>
-
-                          {/* Featured Card Content */}
-                          <div className="reg-featured-body">
-                            {/* Metadata */}
-                            <div className="reg-featured-meta-row">
-                              <div className="reg-featured-meta-pill">
-                                <FiCalendar className="reg-meta-icon" />
-                                <span>
-                                  {event.eventStartDate
-                                    ? formatDateTime(event.eventStartDate)
-                                    : "Date to be announced"}
-                                </span>
-                              </div>
-
-                              <div className="reg-featured-meta-pill">
-                                {event.meetingLink ? (
-                                  <FiVideo className="reg-meta-icon" />
-                                ) : (
-                                  <FiMapPin className="reg-meta-icon" />
-                                )}
-                                <span className="reg-meta-venue-truncate">
-                                  {event.venue ||
-                                    event.location ||
-                                    (event.meetingLink ? "Virtual Meeting" : "MPEC Campus")}
-                                </span>
-                              </div>
-
-                              {event.registrationDeadline && (
-                                <div className="reg-featured-meta-pill reg-meta-deadline">
-                                  <FiClock className="reg-meta-icon" />
-                                  <span>
-                                    Closes: {formatDateTime(event.registrationDeadline)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Title & Description */}
-                            <h3 className="reg-featured-title">{event.title}</h3>
-                            <p className="reg-featured-desc">
-                              {event.tagline ||
-                                event.shortDescription ||
-                                event.description ||
-                                "Join this flagship session organized by Abhyudaya Club."}
-                            </p>
-
-                            {/* Available Seats Indicator (Only when verified by capacity limit data) */}
-                            {maxLimit !== null && (
-                              <div className="reg-featured-seats-box">
-                                <div className="reg-featured-seats-header">
-                                  <span className="reg-seats-label">Available Seats</span>
-                                  <span className="reg-seats-count">
-                                    <strong>{remainingSeats}</strong> left of {maxLimit}
-                                  </span>
-                                </div>
-
-                                <div className="reg-featured-seats-track">
-                                  <div
-                                    className={`reg-featured-seats-fill ${
-                                      remainingSeats <= 10 ? "urgent" : "normal"
-                                    }`}
-                                    style={{ width: `${percentFilled}%` }}
-                                  />
-                                </div>
-
-                                <span className="reg-seats-subtext">
-                                  {remainingSeats <= 10
-                                    ? `🔥 High demand: Only ${remainingSeats} seats remaining`
-                                    : `⚡ Open for registration`}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Highly Visible Gold Call To Action Button */}
-                            <div className="reg-featured-actions">
-                              <button
-                                type="button"
-                                className="reg-featured-btn-register"
-                                onClick={() => openRegistrationModal(event)}
-                              >
-                                <span>Register Now →</span>
-                              </button>
-
-                              <Link
-                                to={`/events/${event.slug || event.id}`}
-                                className="reg-featured-btn-details"
-                              >
-                                <span>View Details</span>
-                              </Link>
-                            </div>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {/* ============================================================
-                  3B. GENERAL / ALL EXPERIENCES SECTION
-                  Sorted by status priority: Open -> Upcoming -> Closed -> Fully Booked
-                 ============================================================ */}
-              <section
-                className="reg-general-section"
-                aria-labelledby="general-experiences-heading"
-              >
-                <div className="reg-section-header">
-                  <div className="reg-section-eyebrow">
-                    {openFilteredEvents.length > 0
-                      ? "ALL CAMPUS CALENDAR"
-                      : "CAMPUS EXPERIENCES"}
-                  </div>
-                  <h2
-                    id="general-experiences-heading"
-                    className="reg-section-title"
-                  >
-                    {openFilteredEvents.length > 0
-                      ? "All Experiences & Schedule"
-                      : "Upcoming Experiences"}
-                  </h2>
-                  <p className="reg-section-subtitle">
-                    {openFilteredEvents.length > 0
-                      ? "Explore the comprehensive event schedule, upcoming sessions, and recent archives."
-                      : "Reserve your place in upcoming club gatherings, technical intensives, and flagship competitions."}
-                  </p>
-                </div>
-
-                <div className="reg-editorial-grid">
-                  {filteredEvents.map((event) => {
-                    const {
-                      statusInfo,
-                      maxLimit,
-                      remainingSeats,
-                      percentFilled,
-                    } = event;
-                    const isEventOpen = statusInfo.canRegister;
-
-                    return (
-                      <article key={event.id} className="reg-event-card">
-                        {/* Media Banner */}
-                        <div className="reg-card-media">
-                          {event.banner || event.image ? (
-                            <img
-                              src={event.banner || event.image}
-                              alt={event.title}
-                              className="reg-card-img"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="reg-card-fallback-banner">
-                              <span className="reg-fallback-icon">
-                                {event.icon || "🏛️"}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Floating Category Pill */}
-                          <span className="reg-card-category-pill">
-                            {event.category || event.subtitle || "Abhyudaya"}
+                          <span className="dlux-featured-fallback-label">
+                            {ev.category || "Abhyudaya Club"}
                           </span>
+                        </div>
+                      )}
 
-                          {/* Floating Status Badge */}
-                          <span
-                            className={`reg-card-status-badge status-${statusInfo.status.toLowerCase()}`}
-                          >
-                            {statusInfo.label}
+                      {/* Overlays */}
+                      <div className="dlux-featured-overlay-top">
+                        <span className="dlux-featured-cat-pill">
+                          {ev.category || ev.subtitle || "Event"}
+                        </span>
+                        <span className={`dlux-status-badge ${badgeClass}`}>
+                          {statusInfo.status === "OPEN" || statusInfo.status === "CLOSING_SOON" ? (
+                            <span className="dlux-status-glow-dot" aria-hidden="true" />
+                          ) : null}
+                          {isUrgent ? "CLOSING SOON" : "REGISTRATION OPEN"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ── Info Panel ── */}
+                    <div className="dlux-featured-info">
+                      <div className="dlux-featured-info-cat">
+                        {ev.category || "Featured Event"}
+                      </div>
+
+                      <h3 className="dlux-featured-title">{ev.title}</h3>
+
+                      <p className="dlux-featured-desc">
+                        {ev.tagline || ev.shortDescription || ev.description ||
+                          "Join this flagship session organized by Abhyudaya Club, MPEC Kanpur."}
+                      </p>
+
+                      <div className="dlux-meta-stack">
+                        <div className="dlux-meta-row">
+                          <FiCalendar className="dlux-meta-icon" aria-hidden="true" />
+                          <span>
+                            {ev.eventStartDate
+                              ? formatDateTime(ev.eventStartDate)
+                              : "Date to be announced"}
                           </span>
                         </div>
 
-                        {/* Card Content */}
-                        <div className="reg-card-content">
-                          {/* Meta: Date & Venue */}
-                          <div className="reg-card-meta">
-                            <div className="reg-meta-item">
-                              <FiCalendar className="reg-meta-icon" />
-                              <span>
-                                {event.eventStartDate
-                                  ? formatDateTime(event.eventStartDate)
-                                  : "Date to be announced"}
-                              </span>
-                            </div>
+                        <div className="dlux-meta-row">
+                          {ev.meetingLink ? (
+                            <FiVideo className="dlux-meta-icon" aria-hidden="true" />
+                          ) : (
+                            <FiMapPin className="dlux-meta-icon" aria-hidden="true" />
+                          )}
+                          <span>
+                            {ev.venue || ev.location ||
+                              (ev.meetingLink ? "Virtual Meeting" : "MPEC Campus, Kanpur")}
+                          </span>
+                        </div>
 
-                            <div className="reg-meta-item">
-                              {event.meetingLink ? (
-                                <FiVideo className="reg-meta-icon" />
-                              ) : (
-                                <FiMapPin className="reg-meta-icon" />
-                              )}
-                              <span className="reg-meta-venue-truncate">
-                                {event.venue ||
-                                  event.location ||
-                                  (event.meetingLink ? "Virtual Meeting" : "MPEC Campus")}
-                              </span>
-                            </div>
-
-                            {event.registrationDeadline && (
-                              <div className="reg-meta-item reg-deadline-item">
-                                <FiClock className="reg-meta-icon" />
-                                <span>
-                                  Deadline: {formatDateTime(event.registrationDeadline)}
-                                </span>
-                              </div>
-                            )}
+                        {ev.registrationDeadline && (
+                          <div className="dlux-meta-row dlux-meta-deadline">
+                            <FiClock className="dlux-meta-icon" aria-hidden="true" />
+                            <span>Closes: {formatDateTime(ev.registrationDeadline)}</span>
                           </div>
+                        )}
+                      </div>
 
-                          {/* Title & Tagline */}
-                          <h3 className="reg-card-title">{event.title}</h3>
-                          {event.tagline ? (
-                            <p className="reg-card-tagline">{event.tagline}</p>
-                          ) : event.shortDescription || event.description ? (
-                            <p className="reg-card-tagline">
-                              {event.shortDescription || event.description}
-                            </p>
-                          ) : null}
+                      <div className="dlux-info-divider" aria-hidden="true" />
 
-                          {/* Available Seats Indicator */}
-                          {maxLimit !== null && (
-                            <div className="reg-card-capacity-wrap">
-                              <div className="reg-capacity-header">
-                                <span className="reg-capacity-label">Available Seats</span>
-                                <span className="reg-capacity-numbers">
-                                  <strong>{remainingSeats}</strong> left of {maxLimit}
-                                </span>
-                              </div>
+                      {/* Countdown */}
+                      {ev.countdownEnabled && (ev.countdownTarget || ev.eventStartDate) && (
+                        <div className="dlux-featured-countdown">
+                          <EventCountdown
+                            targetDate={ev.countdownTarget || ev.eventStartDate}
+                            title="Event Starts In"
+                            variant="card"
+                          />
+                        </div>
+                      )}
 
-                              <div className="reg-capacity-progress-track">
-                                <div
-                                  className={`reg-capacity-progress-fill ${
-                                    remainingSeats === 0
-                                      ? "is-full"
-                                      : remainingSeats <= 10
-                                      ? "is-urgent"
-                                      : "is-normal"
-                                  }`}
-                                  style={{ width: `${percentFilled}%` }}
-                                />
-                              </div>
+                      {/* Seats */}
+                      {maxLimit !== null && (
+                        <div className="dlux-seats-box">
+                          <div className="dlux-seats-row">
+                            <span className="dlux-seats-label">Available Seats</span>
+                            <span className="dlux-seats-count">
+                              <strong>{remainingSeats}</strong> / {maxLimit}
+                            </span>
+                          </div>
+                          <div className="dlux-seats-track">
+                            <div
+                              className={`dlux-seats-fill ${fillClass}`}
+                              style={{ width: `${percentFilled}%` }}
+                            />
+                          </div>
+                          <span className={`dlux-seats-note${fillClass === "urgent" ? " urgent" : ""}`}>
+                            {remainingSeats <= 10
+                              ? `Only ${remainingSeats} seats remaining`
+                              : "Open for registration"}
+                          </span>
+                        </div>
+                      )}
 
-                              <div className="reg-capacity-badge-row">
-                                {remainingSeats === 0 ? (
-                                  <span className="reg-capacity-badge-pill is-full">
-                                    Capacity Reached
-                                  </span>
-                                ) : remainingSeats <= 10 ? (
-                                  <span className="reg-capacity-badge-pill is-urgent">
-                                    Only {remainingSeats} seats remaining
-                                  </span>
-                                ) : (
-                                  <span className="reg-capacity-badge-pill is-normal">
-                                    Open registration active
-                                  </span>
-                                )}
+                      <div className="dlux-featured-spacer" />
+
+                      {/* Actions */}
+                      <div className="dlux-featured-actions">
+                        {statusInfo.canRegister ? (
+                          <button
+                            type="button"
+                            className="dlux-btn-gold"
+                            onClick={() => openRegistrationModal(ev)}
+                          >
+                            <span>Register Now →</span>
+                          </button>
+                        ) : (
+                          <span className="dlux-btn-disabled">
+                            {statusInfo.label}
+                          </span>
+                        )}
+                        <Link
+                          to={`/events/${ev.slug || ev.id}`}
+                          className="dlux-btn-ghost"
+                        >
+                          <span>View Details</span>
+                          <FiArrowRight />
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              );
+            })()}
+
+            {/* ============================================================
+                REMAINING EVENTS GRID
+               ============================================================ */}
+            {remainingEvents.length > 0 && (
+              <div className="dlux-grid-section">
+                <p className="dlux-grid-eyebrow">MORE OPEN EVENTS</p>
+                <h2 className="dlux-grid-heading">Also Open for Registration</h2>
+
+                <div className="dlux-grid">
+                  {remainingEvents.map((ev) => {
+                    const { statusInfo, maxLimit, remainingSeats, percentFilled } = ev;
+                    const imgSrc = ev.banner || ev.image;
+                    const badgeClass = statusBadgeClass(statusInfo.status);
+                    const fillClass = remainingSeats !== null && remainingSeats <= 10 ? "urgent" : "normal";
+
+                    return (
+                      <article
+                        key={ev.id}
+                        className="dlux-card"
+                        aria-label={`Event: ${ev.title}`}
+                      >
+                        {/* Card image */}
+                        <div className="dlux-card-media">
+                          {imgSrc ? (
+                            <img
+                              src={imgSrc}
+                              alt={ev.title}
+                              className="dlux-card-img"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="dlux-card-fallback" aria-hidden="true">
+                              <div className="dlux-card-fallback-icon">
+                                <FallbackEmblem />
                               </div>
                             </div>
                           )}
 
-                          {/* Card Footer Actions */}
-                          <div className="reg-card-footer">
-                            {isEventOpen ? (
+                          <div className="dlux-card-overlay">
+                            <span className="dlux-card-cat">
+                              {ev.category || ev.subtitle || "Event"}
+                            </span>
+                            <span className={`dlux-status-badge ${badgeClass}`}>
+                              {statusInfo.status === "OPEN" && (
+                                <span className="dlux-status-glow-dot" aria-hidden="true" />
+                              )}
+                              {statusInfo.label}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card body */}
+                        <div className="dlux-card-body">
+                          <h3 className="dlux-card-title">{ev.title}</h3>
+                          <p className="dlux-card-desc">
+                            {ev.tagline || ev.shortDescription || ev.description || ""}
+                          </p>
+
+                          <div className="dlux-card-meta">
+                            <div className="dlux-card-meta-item">
+                              <FiCalendar className="dlux-card-meta-icon" aria-hidden="true" />
+                              <span>
+                                {ev.eventStartDate
+                                  ? formatDateTime(ev.eventStartDate)
+                                  : "Date TBA"}
+                              </span>
+                            </div>
+                            <div className="dlux-card-meta-item">
+                              {ev.meetingLink ? (
+                                <FiVideo className="dlux-card-meta-icon" aria-hidden="true" />
+                              ) : (
+                                <FiMapPin className="dlux-card-meta-icon" aria-hidden="true" />
+                              )}
+                              <span className="dlux-card-meta-truncate">
+                                {ev.venue || ev.location ||
+                                  (ev.meetingLink ? "Virtual" : "MPEC Campus")}
+                              </span>
+                            </div>
+                            {ev.registrationDeadline && (
+                              <div className="dlux-card-meta-item dlux-card-deadline-item">
+                                <FiClock className="dlux-card-meta-icon" aria-hidden="true" />
+                                <span>Closes: {formatDateTime(ev.registrationDeadline)}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Countdown */}
+                          {ev.countdownEnabled && (ev.countdownTarget || ev.eventStartDate) && (
+                            <div className="dlux-card-countdown-wrap">
+                              <EventCountdown
+                                targetDate={ev.countdownTarget || ev.eventStartDate}
+                                title="Starts In"
+                                variant="compact"
+                              />
+                            </div>
+                          )}
+
+                          {/* Capacity */}
+                          {maxLimit !== null && (
+                            <div className="dlux-card-capacity">
+                              <div className="dlux-card-cap-header">
+                                <span className="dlux-card-cap-label">Seats</span>
+                                <span className="dlux-card-cap-count">
+                                  {remainingSeats} / {maxLimit}
+                                </span>
+                              </div>
+                              <div className="dlux-card-cap-track">
+                                <div
+                                  className={`dlux-card-cap-fill ${fillClass}`}
+                                  style={{ width: `${percentFilled}%` }}
+                                />
+                              </div>
+                              <span className={`dlux-card-cap-note${fillClass === "urgent" ? " urgent" : ""}`}>
+                                {remainingSeats <= 10
+                                  ? `${remainingSeats} seats left`
+                                  : "Open"}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div className="dlux-card-actions">
+                            {statusInfo.canRegister ? (
                               <button
                                 type="button"
-                                className="reg-card-btn-primary"
-                                onClick={() => openRegistrationModal(event)}
+                                className="dlux-card-btn-primary"
+                                onClick={() => openRegistrationModal(ev)}
                               >
-                                <span>Register Now</span>
-                                <FiArrowRight className="reg-btn-arrow" />
+                                Register →
                               </button>
                             ) : (
-                              <button
-                                type="button"
-                                className="reg-card-btn-disabled"
-                                disabled
-                              >
-                                <span>{statusInfo.label}</span>
-                              </button>
+                              <span className="dlux-card-btn-closed">
+                                {statusInfo.label}
+                              </span>
                             )}
-
                             <Link
-                              to={`/events/${event.slug || event.id}`}
-                              className="reg-card-btn-details"
+                              to={`/events/${ev.slug || ev.id}`}
+                              className="dlux-card-btn-details"
                             >
-                              <span>View Details</span>
+                              Details
                             </Link>
                           </div>
                         </div>
@@ -1069,36 +917,36 @@ export default function RegisterEvent() {
                     );
                   })}
                 </div>
-              </section>
-            </>
-          )}
-        </div>
+              </div>
+            )}
+          </>
+        )}
       </main>
 
       {/* ============================================================
-          4. REGISTRATION FORM MODAL & PASS
+          REGISTRATION MODAL
          ============================================================ */}
       {modalEvent && (
         <div
-          className="reg-modal-backdrop"
+          className="dlux-modal-backdrop"
           onClick={closeRegistrationModal}
           role="presentation"
         >
           <div
-            className="reg-modal-dialog"
+            className="dlux-modal-dialog"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="reg-modal-title"
+            aria-labelledby="dlux-modal-title"
           >
-            {/* Modal Header */}
-            <div className="reg-modal-header">
-              <div className="reg-modal-header-text">
-                <span className="reg-modal-eyebrow">ABHYUDAYA REGISTRATION</span>
-                <h2 id="reg-modal-title" className="reg-modal-title">
+            {/* Header */}
+            <div className="dlux-modal-header">
+              <div className="dlux-modal-header-text">
+                <span className="dlux-modal-eyebrow">ABHYUDAYA REGISTRATION</span>
+                <h2 id="dlux-modal-title" className="dlux-modal-title">
                   {modalEvent.title}
                 </h2>
-                <div className="reg-modal-meta-row">
+                <div className="dlux-modal-meta">
                   {modalEvent.eventStartDate && (
                     <span>📅 {formatDateTime(modalEvent.eventStartDate)}</span>
                   )}
@@ -1107,10 +955,9 @@ export default function RegisterEvent() {
                   )}
                 </div>
               </div>
-
               <button
                 type="button"
-                className="reg-modal-close-btn"
+                className="dlux-modal-close"
                 onClick={closeRegistrationModal}
                 aria-label="Close registration form"
               >
@@ -1118,236 +965,175 @@ export default function RegisterEvent() {
               </button>
             </div>
 
-            {/* Modal Body: Either Success View or Interactive Form */}
+            {/* Body */}
             {registrationResult ? (
-              /* Success View */
-              <div className="reg-modal-success-view">
-                <div className="reg-success-icon-badge" aria-hidden="true">
-                  <FiCheckCircle className="reg-success-icon" />
+              /* Success view */
+              <div className="dlux-success-view">
+                <div className="dlux-success-icon-ring" aria-hidden="true">
+                  <FiCheckCircle className="dlux-success-check" />
                 </div>
 
-                <h3 className="reg-success-heading">Registration Confirmed</h3>
-                <p className="reg-success-subtext">
-                  Welcome aboard, <strong>{registrationResult.name}</strong>! Your
-                  spot for <strong>{registrationResult.eventTitle}</strong> is
-                  officially reserved.
+                <h3 className="dlux-success-heading">Registration Confirmed</h3>
+                <p className="dlux-success-subtext">
+                  Welcome aboard, <strong>{registrationResult.name}</strong>! Your spot for{" "}
+                  <strong>{registrationResult.eventTitle}</strong> is officially reserved.
                 </p>
 
-                {/* Registration ID Pass Card */}
-                <div className="reg-pass-card">
-                  <span className="reg-pass-label">OFFICIAL REGISTRATION PASS</span>
-                  <div className="reg-pass-code-row">
-                    <span className="reg-pass-code">
+                <div className="dlux-pass-card">
+                  <span className="dlux-pass-label">OFFICIAL REGISTRATION PASS</span>
+                  <div className="dlux-pass-code-row">
+                    <span className="dlux-pass-code">
                       {registrationResult.registrationId}
                     </span>
                     <button
                       type="button"
-                      className="reg-pass-copy-btn"
+                      className="dlux-pass-copy-btn"
                       onClick={handleCopyId}
-                      title="Copy Pass ID to clipboard"
+                      title="Copy Pass ID"
                     >
                       {copiedId ? <FiCheck /> : <FiCopy />}
                       <span>{copiedId ? "Copied" : "Copy ID"}</span>
                     </button>
                   </div>
-                  <p className="reg-pass-hint">
-                    Please take a screenshot or keep note of this pass. You may be
-                    prompted to present it at the entry desk.
+                  <p className="dlux-pass-hint">
+                    Take a screenshot or note this pass ID. You may be asked to present it at entry.
                   </p>
                 </div>
 
-                <div className="reg-success-actions">
+                <div className="dlux-success-actions">
                   <button
                     type="button"
-                    className="reg-btn-editorial-gold"
+                    className="dlux-btn-utility"
                     onClick={closeRegistrationModal}
                   >
                     Done &amp; Close
                   </button>
                 </div>
               </div>
+
             ) : (
-              /* Registration Form */
-              <form
-                onSubmit={handleSubmitRegistration}
-                className="reg-modal-form"
-                noValidate
-              >
+              /* Registration form */
+              <form onSubmit={handleSubmitRegistration} className="dlux-modal-form" noValidate>
                 {submitError && (
-                  <div className="reg-form-error-banner" role="alert">
-                    <FiAlertCircle className="reg-error-icon" />
+                  <div className="dlux-form-error-banner" role="alert">
+                    <FiAlertCircle />
                     <span>{submitError}</span>
                   </div>
                 )}
 
-                <div className="reg-form-fields-scroll">
+                <div className="dlux-form-scroll">
                   {/* Full Name */}
-                  <div className="reg-form-group">
-                    <label htmlFor="reg-name" className="reg-form-label">
-                      Full Name <span className="reg-required">*</span>
+                  <div className="dlux-form-group">
+                    <label htmlFor="dlux-name" className="dlux-form-label">
+                      Full Name <span className="dlux-required">*</span>
                     </label>
                     <input
-                      id="reg-name"
+                      id="dlux-name"
                       type="text"
-                      className={`reg-form-input ${
-                        formErrors.name ? "has-error" : ""
-                      }`}
+                      className={`dlux-form-input${formErrors.name ? " has-error" : ""}`}
                       placeholder="e.g. Aryan Sharma"
                       value={formData.name}
-                      onChange={(e) => {
-                        setFormData((p) => ({ ...p, name: e.target.value }));
-                        setFormErrors((p) => ({ ...p, name: "" }));
-                      }}
+                      onChange={(e) => { setFormData((p) => ({ ...p, name: e.target.value })); setFormErrors((p) => ({ ...p, name: "" })); }}
                       disabled={submitting}
                     />
-                    {formErrors.name && (
-                      <span className="reg-field-error-msg">{formErrors.name}</span>
-                    )}
+                    {formErrors.name && <span className="dlux-field-error">{formErrors.name}</span>}
                   </div>
 
                   {/* Primary Email */}
-                  <div className="reg-form-group">
-                    <label htmlFor="reg-email" className="reg-form-label">
-                      Personal / Verified Email <span className="reg-required">*</span>
+                  <div className="dlux-form-group">
+                    <label htmlFor="dlux-email" className="dlux-form-label">
+                      Personal Email <span className="dlux-required">*</span>
                     </label>
                     <input
-                      id="reg-email"
+                      id="dlux-email"
                       type="email"
-                      className={`reg-form-input ${
-                        formErrors.email ? "has-error" : ""
-                      }`}
+                      className={`dlux-form-input${formErrors.email ? " has-error" : ""}`}
                       placeholder="e.g. aryan@gmail.com"
                       value={formData.email}
-                      onChange={(e) => {
-                        setFormData((p) => ({ ...p, email: e.target.value }));
-                        setFormErrors((p) => ({ ...p, email: "" }));
-                      }}
+                      onChange={(e) => { setFormData((p) => ({ ...p, email: e.target.value })); setFormErrors((p) => ({ ...p, email: "" })); }}
                       disabled={submitting}
                     />
-                    {formErrors.email && (
-                      <span className="reg-field-error-msg">{formErrors.email}</span>
-                    )}
+                    {formErrors.email && <span className="dlux-field-error">{formErrors.email}</span>}
                   </div>
 
-                  {/* College Email (if enabled) */}
+                  {/* College Email */}
                   {modalEvent.formFields?.collegeEmail?.enabled !== false && (
-                    <div className="reg-form-group">
-                      <label htmlFor="reg-college-email" className="reg-form-label">
+                    <div className="dlux-form-group">
+                      <label htmlFor="dlux-college-email" className="dlux-form-label">
                         College Email{" "}
                         {modalEvent.formFields?.collegeEmail?.required && (
-                          <span className="reg-required">*</span>
+                          <span className="dlux-required">*</span>
                         )}
                       </label>
                       <input
-                        id="reg-college-email"
+                        id="dlux-college-email"
                         type="email"
-                        className={`reg-form-input ${
-                          formErrors.collegeEmail ? "has-error" : ""
-                        }`}
+                        className={`dlux-form-input${formErrors.collegeEmail ? " has-error" : ""}`}
                         placeholder="e.g. aryan.21cs@mpgi.edu.in"
                         value={formData.collegeEmail}
-                        onChange={(e) => {
-                          setFormData((p) => ({
-                            ...p,
-                            collegeEmail: e.target.value,
-                          }));
-                          setFormErrors((p) => ({ ...p, collegeEmail: "" }));
-                        }}
+                        onChange={(e) => { setFormData((p) => ({ ...p, collegeEmail: e.target.value })); setFormErrors((p) => ({ ...p, collegeEmail: "" })); }}
                         disabled={submitting}
                       />
-                      {formErrors.collegeEmail && (
-                        <span className="reg-field-error-msg">
-                          {formErrors.collegeEmail}
-                        </span>
-                      )}
+                      {formErrors.collegeEmail && <span className="dlux-field-error">{formErrors.collegeEmail}</span>}
                     </div>
                   )}
 
-                  {/* Roll Number (if enabled) */}
+                  {/* Roll Number */}
                   {modalEvent.formFields?.rollNumber?.enabled !== false && (
-                    <div className="reg-form-group">
-                      <label htmlFor="reg-roll" className="reg-form-label">
-                        College Roll Number / Student ID{" "}
+                    <div className="dlux-form-group">
+                      <label htmlFor="dlux-roll" className="dlux-form-label">
+                        Roll Number / Student ID{" "}
                         {modalEvent.formFields?.rollNumber?.required && (
-                          <span className="reg-required">*</span>
+                          <span className="dlux-required">*</span>
                         )}
                       </label>
                       <input
-                        id="reg-roll"
+                        id="dlux-roll"
                         type="text"
-                        className={`reg-form-input ${
-                          formErrors.rollNumber ? "has-error" : ""
-                        }`}
+                        className={`dlux-form-input${formErrors.rollNumber ? " has-error" : ""}`}
                         placeholder="e.g. 2101640100045"
                         value={formData.rollNumber}
-                        onChange={(e) => {
-                          setFormData((p) => ({
-                            ...p,
-                            rollNumber: e.target.value,
-                          }));
-                          setFormErrors((p) => ({ ...p, rollNumber: "" }));
-                        }}
+                        onChange={(e) => { setFormData((p) => ({ ...p, rollNumber: e.target.value })); setFormErrors((p) => ({ ...p, rollNumber: "" })); }}
                         disabled={submitting}
                       />
-                      {formErrors.rollNumber && (
-                        <span className="reg-field-error-msg">
-                          {formErrors.rollNumber}
-                        </span>
-                      )}
+                      {formErrors.rollNumber && <span className="dlux-field-error">{formErrors.rollNumber}</span>}
                     </div>
                   )}
 
-                  {/* Department & Year (if enabled) */}
+                  {/* Department & Year */}
                   {modalEvent.formFields?.departmentYear?.enabled !== false && (
-                    <div className="reg-form-row">
-                      <div className="reg-form-group">
-                        <label htmlFor="reg-dept" className="reg-form-label">
-                          Department / Branch{" "}
+                    <div className="dlux-form-row">
+                      <div className="dlux-form-group">
+                        <label htmlFor="dlux-dept" className="dlux-form-label">
+                          Department{" "}
                           {modalEvent.formFields?.departmentYear?.required && (
-                            <span className="reg-required">*</span>
+                            <span className="dlux-required">*</span>
                           )}
                         </label>
                         <input
-                          id="reg-dept"
+                          id="dlux-dept"
                           type="text"
-                          className={`reg-form-input ${
-                            formErrors.department ? "has-error" : ""
-                          }`}
-                          placeholder="e.g. CSE, IT, ME, ECE"
+                          className={`dlux-form-input${formErrors.department ? " has-error" : ""}`}
+                          placeholder="e.g. CSE, IT, ME"
                           value={formData.department}
-                          onChange={(e) => {
-                            setFormData((p) => ({
-                              ...p,
-                              department: e.target.value,
-                            }));
-                            setFormErrors((p) => ({ ...p, department: "" }));
-                          }}
+                          onChange={(e) => { setFormData((p) => ({ ...p, department: e.target.value })); setFormErrors((p) => ({ ...p, department: "" })); }}
                           disabled={submitting}
                         />
-                        {formErrors.department && (
-                          <span className="reg-field-error-msg">
-                            {formErrors.department}
-                          </span>
-                        )}
+                        {formErrors.department && <span className="dlux-field-error">{formErrors.department}</span>}
                       </div>
 
-                      <div className="reg-form-group">
-                        <label htmlFor="reg-year" className="reg-form-label">
-                          Year / Semester{" "}
+                      <div className="dlux-form-group">
+                        <label htmlFor="dlux-year" className="dlux-form-label">
+                          Year{" "}
                           {modalEvent.formFields?.departmentYear?.required && (
-                            <span className="reg-required">*</span>
+                            <span className="dlux-required">*</span>
                           )}
                         </label>
                         <select
-                          id="reg-year"
-                          className={`reg-form-select ${
-                            formErrors.year ? "has-error" : ""
-                          }`}
+                          id="dlux-year"
+                          className={`dlux-form-select${formErrors.year ? " has-error" : ""}`}
                           value={formData.year}
-                          onChange={(e) => {
-                            setFormData((p) => ({ ...p, year: e.target.value }));
-                            setFormErrors((p) => ({ ...p, year: "" }));
-                          }}
+                          onChange={(e) => { setFormData((p) => ({ ...p, year: e.target.value })); setFormErrors((p) => ({ ...p, year: "" })); }}
                           disabled={submitting}
                         >
                           <option value="">Select Year</option>
@@ -1358,43 +1144,30 @@ export default function RegisterEvent() {
                           <option value="MCA / M.Tech">MCA / M.Tech</option>
                           <option value="Faculty / Other">Faculty / Other</option>
                         </select>
-                        {formErrors.year && (
-                          <span className="reg-field-error-msg">
-                            {formErrors.year}
-                          </span>
-                        )}
+                        {formErrors.year && <span className="dlux-field-error">{formErrors.year}</span>}
                       </div>
                     </div>
                   )}
 
-                  {/* Phone Number (if enabled) */}
+                  {/* Phone */}
                   {modalEvent.formFields?.phone?.enabled !== false && (
-                    <div className="reg-form-group">
-                      <label htmlFor="reg-phone" className="reg-form-label">
+                    <div className="dlux-form-group">
+                      <label htmlFor="dlux-phone" className="dlux-form-label">
                         WhatsApp / Contact Number{" "}
                         {modalEvent.formFields?.phone?.required && (
-                          <span className="reg-required">*</span>
+                          <span className="dlux-required">*</span>
                         )}
                       </label>
                       <input
-                        id="reg-phone"
+                        id="dlux-phone"
                         type="tel"
-                        className={`reg-form-input ${
-                          formErrors.phone ? "has-error" : ""
-                        }`}
+                        className={`dlux-form-input${formErrors.phone ? " has-error" : ""}`}
                         placeholder="+91 98765 43210"
                         value={formData.phone}
-                        onChange={(e) => {
-                          setFormData((p) => ({ ...p, phone: e.target.value }));
-                          setFormErrors((p) => ({ ...p, phone: "" }));
-                        }}
+                        onChange={(e) => { setFormData((p) => ({ ...p, phone: e.target.value })); setFormErrors((p) => ({ ...p, phone: "" })); }}
                         disabled={submitting}
                       />
-                      {formErrors.phone && (
-                        <span className="reg-field-error-msg">
-                          {formErrors.phone}
-                        </span>
-                      )}
+                      {formErrors.phone && <span className="dlux-field-error">{formErrors.phone}</span>}
                     </div>
                   )}
 
@@ -1407,57 +1180,36 @@ export default function RegisterEvent() {
                       : [];
 
                     return (
-                      <div key={q.id || q.label} className="reg-form-group">
-                        <label htmlFor={qKey} className="reg-form-label">
-                          {q.label}{" "}
-                          {q.required && <span className="reg-required">*</span>}
+                      <div key={q.id || q.label} className="dlux-form-group">
+                        <label htmlFor={qKey} className="dlux-form-label">
+                          {q.label} {q.required && <span className="dlux-required">*</span>}
                         </label>
 
                         {q.type === "select" ? (
                           <select
                             id={qKey}
-                            className={`reg-form-select ${
-                              formErrors[qKey] ? "has-error" : ""
-                            }`}
+                            className={`dlux-form-select${formErrors[qKey] ? " has-error" : ""}`}
                             value={currentVal}
                             onChange={(e) => {
                               const val = e.target.value;
-                              setFormData((p) => ({
-                                ...p,
-                                customAnswers: {
-                                  ...p.customAnswers,
-                                  [q.label]: val,
-                                },
-                              }));
+                              setFormData((p) => ({ ...p, customAnswers: { ...p.customAnswers, [q.label]: val } }));
                               setFormErrors((p) => ({ ...p, [qKey]: "" }));
                             }}
                             disabled={submitting}
                           >
                             <option value="">Select an option</option>
-                            {opts.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
+                            {opts.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
                         ) : q.type === "textarea" ? (
                           <textarea
                             id={qKey}
                             rows={3}
-                            className={`reg-form-textarea ${
-                              formErrors[qKey] ? "has-error" : ""
-                            }`}
+                            className={`dlux-form-textarea${formErrors[qKey] ? " has-error" : ""}`}
                             placeholder="Type your response..."
                             value={currentVal}
                             onChange={(e) => {
                               const val = e.target.value;
-                              setFormData((p) => ({
-                                ...p,
-                                customAnswers: {
-                                  ...p.customAnswers,
-                                  [q.label]: val,
-                                },
-                              }));
+                              setFormData((p) => ({ ...p, customAnswers: { ...p.customAnswers, [q.label]: val } }));
                               setFormErrors((p) => ({ ...p, [qKey]: "" }));
                             }}
                             disabled={submitting}
@@ -1466,41 +1218,29 @@ export default function RegisterEvent() {
                           <input
                             id={qKey}
                             type="text"
-                            className={`reg-form-input ${
-                              formErrors[qKey] ? "has-error" : ""
-                            }`}
+                            className={`dlux-form-input${formErrors[qKey] ? " has-error" : ""}`}
                             placeholder="Your answer"
                             value={currentVal}
                             onChange={(e) => {
                               const val = e.target.value;
-                              setFormData((p) => ({
-                                ...p,
-                                customAnswers: {
-                                  ...p.customAnswers,
-                                  [q.label]: val,
-                                },
-                              }));
+                              setFormData((p) => ({ ...p, customAnswers: { ...p.customAnswers, [q.label]: val } }));
                               setFormErrors((p) => ({ ...p, [qKey]: "" }));
                             }}
                             disabled={submitting}
                           />
                         )}
 
-                        {formErrors[qKey] && (
-                          <span className="reg-field-error-msg">
-                            {formErrors[qKey]}
-                          </span>
-                        )}
+                        {formErrors[qKey] && <span className="dlux-field-error">{formErrors[qKey]}</span>}
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Modal Footer Actions */}
-                <div className="reg-modal-footer">
+                {/* Footer */}
+                <div className="dlux-modal-footer">
                   <button
                     type="button"
-                    className="reg-modal-btn-cancel"
+                    className="dlux-modal-btn-cancel"
                     onClick={closeRegistrationModal}
                     disabled={submitting}
                   >
@@ -1508,7 +1248,7 @@ export default function RegisterEvent() {
                   </button>
                   <button
                     type="submit"
-                    className="reg-modal-btn-submit"
+                    className="dlux-modal-btn-submit"
                     disabled={submitting}
                   >
                     {submitting ? "Registering..." : "Confirm & Register"}

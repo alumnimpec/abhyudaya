@@ -135,6 +135,9 @@ function formatEventDoc(snapshotDoc) {
     isPaid: Boolean(data.isPaid),
     feeAmount: Number.isFinite(Number(data.feeAmount)) ? Number(data.feeAmount) : 0,
     currency: data.currency || "INR",
+    // Countdown Timer Settings
+    countdownEnabled: Boolean(data.countdownEnabled),
+    countdownTarget: data.countdownTarget || data.countdownTargetDate || data.eventStartDate || "",
     createdAt: data.createdAt || null,
     updatedAt: data.updatedAt || null,
   };
@@ -359,6 +362,9 @@ export async function createEvent(eventData, imageFile = null) {
     isPaid: Boolean(eventData.isPaid),
     feeAmount: Number.isFinite(Number(eventData.feeAmount)) ? Number(eventData.feeAmount) : 0,
     currency: eventData.currency || "INR",
+    // Countdown Timer Settings
+    countdownEnabled: Boolean(eventData.countdownEnabled),
+    countdownTarget: eventData.countdownTarget || "",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -425,6 +431,9 @@ export async function updateEvent(id, eventData, imageFile = null) {
     isPaid: Boolean(eventData.isPaid),
     feeAmount: Number.isFinite(Number(eventData.feeAmount)) ? Number(eventData.feeAmount) : 0,
     currency: eventData.currency || "INR",
+    // Countdown Timer Settings
+    countdownEnabled: Boolean(eventData.countdownEnabled),
+    countdownTarget: eventData.countdownTarget || "",
     updatedAt: serverTimestamp(),
   };
 

@@ -174,5 +174,8 @@ export function normalizeEvent(event) {
     isPaid: Boolean(event.isPaid),
     feeAmount: Number.isFinite(Number(event.feeAmount)) ? Number(event.feeAmount) : 0,
     currency: event.currency || "INR",
+    // Countdown Timer Settings
+    countdownEnabled: Boolean(event.countdownEnabled),
+    countdownTarget: event.countdownTarget || event.countdownTargetDate || event.eventStartDate || "",
   };
 }

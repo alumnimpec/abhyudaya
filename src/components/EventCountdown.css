@@ -1,0 +1,165 @@
+/* ==========================================================================
+   EVENT COUNTDOWN COMPONENT STYLES
+   Theme: Midnight Navy (#10182D), Elegant Gold (#E7B544), Warm Cream (#FAF4E9)
+   ========================================================================== */
+
+.event-countdown-wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  background: #10182D;
+  color: #FAF4E9;
+  border: 1.5px solid rgba(231, 181, 68, 0.4);
+  border-radius: 16px;
+  padding: 12px 18px;
+  box-shadow: 0 8px 24px rgba(16, 24, 45, 0.15);
+  transition: all 0.25s ease;
+}
+
+.countdown-header-title {
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #E7B544;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.countdown-header-title::before {
+  content: "⏳";
+  font-size: 0.85rem;
+}
+
+/* Digits Grid */
+.countdown-digits-grid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.countdown-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 44px;
+}
+
+.countdown-num-box {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(231, 181, 68, 0.25);
+  border-radius: 8px;
+  padding: 4px 6px;
+  width: 100%;
+  text-align: center;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.countdown-num {
+  font-family: var(--font-utility, "Space Grotesk", monospace);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #FFFFFF;
+  letter-spacing: 0.04em;
+}
+
+.countdown-num.accent-gold {
+  color: #E7B544;
+}
+
+.countdown-label {
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94A3B8;
+  margin-top: 4px;
+}
+
+.countdown-separator {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #E7B544;
+  margin-top: -12px;
+  opacity: 0.8;
+}
+
+/* "Event Started" status */
+.event-countdown-wrapper.is-started {
+  padding: 8px 16px;
+  background: rgba(16, 24, 45, 0.85);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.countdown-started-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #10B981;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.started-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 8px #10B981;
+}
+
+/* ── Hero Variant ── */
+.event-countdown-wrapper.hero {
+  background: rgba(16, 24, 45, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 2px solid #E7B544;
+  padding: 16px 24px;
+  border-radius: 20px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+}
+
+.event-countdown-wrapper.hero .countdown-num {
+  font-size: 1.6rem;
+}
+
+.event-countdown-wrapper.hero .countdown-unit {
+  min-width: 54px;
+}
+
+/* ── Compact Variant (e.g. inside cards) ── */
+.event-countdown-wrapper.compact {
+  padding: 8px 12px;
+  border-radius: 12px;
+  gap: 4px;
+  width: auto;
+}
+
+.event-countdown-wrapper.compact .countdown-header-title {
+  font-size: 0.68rem;
+}
+
+.event-countdown-wrapper.compact .countdown-num {
+  font-size: 1rem;
+}
+
+.event-countdown-wrapper.compact .countdown-unit {
+  min-width: 34px;
+}
+
+.event-countdown-wrapper.compact .countdown-separator {
+  font-size: 0.95rem;
+  margin-top: -8px;
+}
+
+.event-countdown-wrapper.compact .countdown-label {
+  font-size: 0.6rem;
+}
