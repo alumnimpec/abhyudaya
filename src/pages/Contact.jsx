@@ -210,101 +210,115 @@ export default function Contact() {
 
       <PageHero
         eyebrow="Get in Touch"
-        title="Let's Connect."
+        title="Let's Connect"
         lede="Have a question, collaboration idea, or want to know more about Abhyudaya Club? We'd love to hear from you."
       />
 
-      <section className="section">
+      <section className="section contact-section">
         <div className="wrap contact-grid" ref={gridRef}>
           {/* Contact Information */}
           <div className="contact-info">
-            <div className="contact-info__block reveal">
-              <p className="eyebrow">📍 Address</p>
-              <p className="contact-info__text">{club.institute}</p>
-              <p className="contact-info__text">{club.department}</p>
+            {/* Campus Location & Map Card */}
+            <div className="contact-info__block contact-location-card reveal">
+              <div className="contact-location-info">
+                <p className="eyebrow contact-eyebrow">📍 Campus Location</p>
+                <h3 className="contact-location-title">{club.institute}</h3>
+                <p className="contact-info__text">{club.department}</p>
+              </div>
+
+              {/* Map */}
+              <div className="contact-map">
+                <iframe
+                  title="Club location map"
+                  className="contact-map__frame"
+                  src={`https://maps.google.com/maps?q=${mapQuery}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
             </div>
 
-            {/* Map */}
-            <div className="contact-info__block contact-map reveal">
-              <iframe
-                title="Club location map"
-                className="contact-map__frame"
-                src={`https://maps.google.com/maps?q=${mapQuery}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
-
-            <div className="contact-info__block reveal">
-              <p className="eyebrow">📧 Email</p>
-              <a
-                href={`mailto:${socials.email}`}
-                className="contact-info__text contact-info__email"
-              >
-                {socials.email}
-              </a>
-            </div>
-
-            <div className="contact-info__block reveal">
-              <p className="eyebrow">🌐 Follow Us</p>
-              <div className="contact-info__socials">
+            {/* Direct Inquiries & Social Channels Card */}
+            <div className="contact-info__block contact-channels-card reveal">
+              <div className="contact-channel-item">
+                <p className="eyebrow contact-eyebrow">📧 Direct Email</p>
                 <a
-                  href={socials.instagram}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="social-pill"
+                  href={`mailto:${socials.email}`}
+                  className="contact-info__text contact-info__email"
                 >
-                  Instagram
+                  {socials.email}
                 </a>
-                <a
-                  href={socials.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="social-pill"
-                >
-                  LinkedIn
-                </a>
-                {socials.twitter && (
+                <span className="contact-response-badge">Replies within 24–48 hours</span>
+              </div>
+
+              <div className="contact-channel-divider" />
+
+              <div className="contact-channel-item">
+                <p className="eyebrow contact-eyebrow">🌐 Connect With Us</p>
+                <div className="contact-info__socials">
                   <a
-                    href={socials.twitter}
+                    href={socials.instagram}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="social-pill"
+                    className="social-pill social-pill--instagram"
                   >
-                    Twitter / X
+                    Instagram
                   </a>
-                )}
-                {socials.whatsapp && (
                   <a
-                    href={socials.whatsapp}
+                    href={socials.linkedin}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="social-pill"
+                    className="social-pill social-pill--linkedin"
                   >
-                    WhatsApp
+                    LinkedIn
                   </a>
-                )}
-                {socials.youtube && (
-                  <a
-                    href={socials.youtube}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="social-pill"
-                  >
-                    YouTube
-                  </a>
-                )}
+                  {socials.twitter && (
+                    <a
+                      href={socials.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="social-pill"
+                    >
+                      Twitter / X
+                    </a>
+                  )}
+                  {socials.whatsapp && (
+                    <a
+                      href={socials.whatsapp}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="social-pill"
+                    >
+                      WhatsApp
+                    </a>
+                  )}
+                  {socials.youtube && (
+                    <a
+                      href={socials.youtube}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="social-pill"
+                    >
+                      YouTube
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Contact Inquiry Form */}
           <div className="join-card reveal">
-            <span className="join-badge">📩 Send Us a Message</span>
-            <h2>Get in Touch Directly</h2>
-            <p className="contact-card-sub">
-              Fill out the form below and we will respond as soon as possible.
-            </p>
+            <div className="contact-card-header">
+              <span className="join-badge">
+                <span className="join-badge__dot" aria-hidden="true" />
+                Direct Inquiry
+              </span>
+              <h2 className="contact-card-title">Let's start a conversation.</h2>
+              <p className="contact-card-sub">
+                Have a query, collaboration idea, or proposal? Fill out the details below and our team will get back to you shortly.
+              </p>
+            </div>
 
             {submittedStatus && (
               <div
@@ -326,9 +340,10 @@ export default function Contact() {
             )}
 
             <form onSubmit={handleFormSubmit} className="contact-form" noValidate>
-              <div className="form-group">
+              <div className="form-group form-group--name">
                 <label htmlFor="contact-name" className="form-label">
-                  Full Name <span className="req">*</span>
+                  <span>Full Name</span>
+                  <span className="req" aria-hidden="true">*</span>
                 </label>
                 <input
                   id="contact-name"
@@ -350,9 +365,10 @@ export default function Contact() {
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="form-group form-group--email">
                 <label htmlFor="contact-email" className="form-label">
-                  Email Address <span className="req">*</span>
+                  <span>Email Address</span>
+                  <span className="req" aria-hidden="true">*</span>
                 </label>
                 <input
                   id="contact-email"
@@ -374,9 +390,10 @@ export default function Contact() {
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="form-group form-group--phone">
                 <label htmlFor="contact-phone" className="form-label">
-                  Phone Number <span className="opt">(Optional)</span>
+                  <span>Phone Number</span>
+                  <span className="opt">Optional</span>
                 </label>
                 <input
                   id="contact-phone"
@@ -397,9 +414,10 @@ export default function Contact() {
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="form-group form-group--subject">
                 <label htmlFor="contact-subject" className="form-label">
-                  Subject / Topic <span className="opt">(Optional)</span>
+                  <span>Subject / Topic</span>
+                  <span className="opt">Optional</span>
                 </label>
                 <input
                   id="contact-subject"
@@ -413,13 +431,14 @@ export default function Contact() {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-group form-group--message form-group--full">
                 <label htmlFor="contact-message" className="form-label">
-                  Message <span className="req">*</span>
+                  <span>Message</span>
+                  <span className="req" aria-hidden="true">*</span>
                 </label>
                 <textarea
                   id="contact-message"
-                  rows="4"
+                  rows="5"
                   name="message"
                   value={formState.message}
                   onChange={handleInputChange}
@@ -449,7 +468,12 @@ export default function Contact() {
                     Sending Message...
                   </span>
                 ) : (
-                  "Submit Message →"
+                  <span className="contact-submit-text">
+                    Submit Message
+                    <span className="contact-submit-arrow" aria-hidden="true">
+                      →
+                    </span>
+                  </span>
                 )}
               </button>
             </form>
