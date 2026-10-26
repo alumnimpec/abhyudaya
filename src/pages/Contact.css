@@ -52,7 +52,6 @@
 .contact-hero__badge {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   background: rgba(238, 184, 74, 0.1);
   border: 1px solid rgba(238, 184, 74, 0.3);
   padding: 6px 14px;
@@ -61,26 +60,7 @@
   backdrop-filter: blur(8px);
 }
 
-.contact-hero__badge-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #eeb84a;
-  box-shadow: 0 0 10px #eeb84a, 0 0 18px rgba(238, 184, 74, 0.6);
-  animation: terminalPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  flex-shrink: 0;
-}
 
-@keyframes terminalPulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.45;
-    transform: scale(0.85);
-  }
-}
 
 .contact-hero__badge-text {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -94,20 +74,21 @@
 /* Hero Typography */
 .contact-hero__title {
   font-family: var(--font-display, "Fraunces", serif);
-  font-size: clamp(2.4rem, 5.5vw, 4.2rem);
-  line-height: 1.1;
+  font-size: clamp(1.85rem, 5vw, 3.8rem);
+  line-height: 1.15;
   letter-spacing: -0.025em;
   font-weight: 800;
   color: #ffffff;
   margin: 0 0 1rem 0;
+  overflow-wrap: break-word;
 }
 
 .contact-hero__subtitle {
   display: block;
-  margin-top: 0.25rem;
+  margin-top: 0.35rem;
   font-family: var(--font-utility, "Space Grotesk", sans-serif);
   font-weight: 700;
-  font-size: clamp(1.4rem, 3.2vw, 2.2rem);
+  font-size: clamp(1.35rem, 3.4vw, 2.2rem);
   letter-spacing: -0.015em;
   background: linear-gradient(135deg, #ffd166 0%, #f7a838 100%);
   -webkit-background-clip: text;
@@ -116,11 +97,12 @@
 }
 
 .contact-hero__lede {
-  color: rgba(251, 244, 232, 0.82);
-  font-size: clamp(1rem, 1.8vw, 1.15rem);
+  color: rgba(251, 244, 232, 0.85);
+  font-size: clamp(0.98rem, 1.8vw, 1.15rem);
   line-height: 1.7;
   max-width: 680px;
   margin: 0 0 1.8rem 0;
+  overflow-wrap: break-word;
 }
 
 /* ── Interactive Terminal Window Box ─────────────────────────────────────── */
@@ -419,39 +401,6 @@
   box-shadow: 0 22px 48px -10px rgba(7, 13, 28, 0.65), 0 0 0 1px rgba(238, 184, 74, 0.16);
 }
 
-/* Status Badge */
-.inbox-status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(238, 184, 74, 0.12);
-  color: #ffd166;
-  border: 1px solid rgba(238, 184, 74, 0.28);
-  padding: 5px 12px;
-  border-radius: 999px;
-  margin-bottom: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.inbox-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #eeb84a;
-  box-shadow: 0 0 8px #eeb84a;
-  flex-shrink: 0;
-  animation: statusPulse 1.8s infinite;
-}
-
-@keyframes statusPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
-
 .contact-card-title {
   color: #ffffff !important;
   font-family: var(--font-display, "Fraunces", serif);
@@ -480,10 +429,10 @@
 
 .issue-selector-label {
   display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.72rem;
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
   color: #ffd166;
   margin-bottom: 10px;
 }
@@ -495,10 +444,10 @@
 }
 
 .issue-card {
-  background: rgba(15, 23, 42, 0.75);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 13px 15px;
   text-align: left;
   cursor: pointer;
   color: #ffffff;
@@ -511,7 +460,7 @@
 
 .issue-card:hover {
   background: rgba(26, 36, 66, 0.85);
-  border-color: rgba(238, 184, 74, 0.38);
+  border-color: rgba(238, 184, 74, 0.4);
   transform: translateY(-2px);
 }
 
@@ -523,44 +472,12 @@
 .issue-card.is-selected {
   background: rgba(238, 184, 74, 0.12);
   border-color: #eeb84a;
-  box-shadow: 0 0 14px rgba(238, 184, 74, 0.2), inset 0 0 0 1px #eeb84a;
-}
-
-.issue-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.issue-card__badge {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #cbd5e1;
-}
-
-.issue-card.is-selected .issue-card__badge {
-  background: rgba(238, 184, 74, 0.24);
-  color: #ffd166;
-}
-
-.issue-card__indicator {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.3);
-  line-height: 1;
-}
-
-.issue-card.is-selected .issue-card__indicator {
-  color: #eeb84a;
+  box-shadow: 0 0 14px rgba(238, 184, 74, 0.18), inset 0 0 0 1px #eeb84a;
 }
 
 .issue-card__title {
   font-family: var(--font-utility, "Space Grotesk", sans-serif);
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: #ffffff;
 }
@@ -570,16 +487,16 @@
 }
 
 .issue-card__subtitle {
-  font-size: 0.75rem;
-  color: rgba(251, 244, 232, 0.65);
-  line-height: 1.35;
+  font-size: 0.78rem;
+  color: rgba(251, 244, 232, 0.72);
+  line-height: 1.4;
 }
 
 /* Issue Reaction Box */
 .issue-reaction-box {
   margin-top: 12px;
   padding: 10px 14px;
-  background: rgba(8, 14, 30, 0.95);
+  background: rgba(8, 14, 30, 0.85);
   border-left: 3px solid #eeb84a;
   border-radius: 6px;
   display: flex;
@@ -814,7 +731,15 @@
 .contact-submit-text {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  max-width: 100%;
+}
+
+.contact-submit-text span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .contact-submit-arrow {
@@ -1117,8 +1042,6 @@
     transform: none !important;
     animation: none !important;
   }
-  .contact-hero__badge-pulse,
-  .inbox-status-dot,
   .terminal-cursor {
     animation: none !important;
   }

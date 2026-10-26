@@ -42,69 +42,65 @@ const ISSUE_OPTIONS = [
   {
     id: "bug",
     label: "Code Bug",
-    subtitle: "It worked five minutes ago.",
+    subtitle: "Something's broken on the website.",
     reaction: "Have you tried Googling the error, restarting VS Code, and blaming the compiler?",
-    subjectPreload: "Bug Report: It worked five minutes ago",
-    badge: "DEBUG",
+    subjectPreload: "Code Bug",
   },
   {
     id: "event",
     label: "Event Idea",
-    subtitle: "Hear me out, bro.",
+    subtitle: "I've got an idea. Hear me out.",
     reaction: "How many volunteers, extension boards, and last-minute poster edits are we talking about?",
-    subjectPreload: "Event Idea: Hear me out, bro",
-    badge: "PITCH",
+    subjectPreload: "Event Idea",
   },
   {
     id: "collab",
     label: "Collaboration",
-    subtitle: "I bring ideas. And vibes.",
+    subtitle: "Let's make something happen.",
     reaction: "Please confirm that at least one team member will actually push the code.",
-    subjectPreload: "Collaboration: I bring ideas. And vibes.",
-    badge: "SYNERGY",
+    subjectPreload: "Collaboration",
   },
   {
     id: "other",
     label: "Other Issue",
-    subtitle: "Long story, short deadline.",
+    subtitle: "It's a bit of a long story.",
     reaction: "Tell us the lore. We'll debug the situation together.",
-    subjectPreload: "Other Query: Long story, short deadline",
-    badge: "CUSTOM",
+    subjectPreload: "Other Issue",
   },
 ];
 
 const FAQ_ITEMS = [
   {
-    question: "Can I join if I don't know how to code?",
-    answer: "Absolutely. Even the most experienced developer once searched 'how to center a div'. Curiosity matters more than your current skill level.",
+    question: "Do I need technical skills to join Abhyudaya?",
+    answer: "Not really. We need people who can code, design, manage events, handle PR, and occasionally reply to messages. Being useful comes in many forms.",
   },
   {
     question: "My CGPA is fighting for its life. Can I still join?",
-    answer: "Your CGPA doesn't define your personality. Bring your curiosity, teamwork, and willingness to contribute. Any specific academic eligibility rules still apply.",
+    answer: "Yes. Abhyudaya is a club, not a supplementary exam. Just learn to manage your time before your deadlines start managing you.",
   },
   {
     question: "How quickly will you reply?",
-    answer: "Our target is 24–48 hours. We'd promise 2 milliseconds, but we're a student club, not a production server.",
+    answer: "Usually within 24–48 hours. Unless assignments and attendance decide otherwise.",
   },
   {
     question: "Can I suggest an event even if I'm not an admin?",
-    answer: "Of course! Great ideas don't require admin privileges. Send us your proposal; the team will review what can be done.",
+    answer: "Of course. You don't need admin access to have ideas. Getting everyone to agree on them is the actual boss level.",
   },
   {
     question: "What if my idea sounds completely crazy?",
-    answer: "Please proceed. Just include enough details for us to tell the difference between an innovative workshop and a plan that requires three all-nighters.",
+    answer: "Pitch it. We've heard worse ideas in group projects. Just bring something more convincing than “bro, trust me.”",
   },
   {
-    question: "Why isn't my code working?",
-    answer: "We'd love to help, but our contact form doesn't support mind-reading yet. Send us the error, what you expected, and what actually happened.",
+    question: "Can I contribute if I have no experience?",
+    answer: "Yes. Experience comes with doing things. Confidence without contribution is just a LinkedIn headline.",
   },
   {
     question: "Can I join just for the snacks?",
-    answer: "We cannot guarantee snacks at every event. Checking the event details beforehand is a better strategy than arriving with an empty stomach.",
+    answer: "We respect the honesty. But this is a Science & Literary Club, not a food court. Snacks are a possibility, not a placement guarantee.",
   },
   {
     question: "What if I submit a message twice?",
-    answer: "Congratulations, you've discovered duplicate requests. We'll do our best to avoid duplicate follow-ups, but please give us a little time to respond.",
+    answer: "We'll probably receive it twice. Give us time to reply before turning one enquiry into a follow-up campaign.",
   },
 ];
 
@@ -145,14 +141,14 @@ export default function Contact() {
     const messageTrim = formState.message.trim();
 
     if (!nameTrim) {
-      newErrors.name = "Who's authoring this commit? Full name is required.";
+      newErrors.name = "Please enter your name.";
     } else if (nameTrim.length < 2) {
       newErrors.name = "Name must be at least 2 characters.";
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailTrim) {
-      newErrors.email = "Where should we push replies? Email address is required.";
+      newErrors.email = "Please enter your email address.";
     } else if (!emailRegex.test(emailTrim)) {
       newErrors.email = "Please enter a valid email address (e.g. name@domain.com).";
     }
@@ -165,7 +161,7 @@ export default function Contact() {
     }
 
     if (!messageTrim) {
-      newErrors.message = "Error 400: Message missing. Even our AI can't guess what you're thinking.";
+      newErrors.message = "Please enter a message before sending.";
     } else if (messageTrim.length < 5) {
       newErrors.message = "Message must be at least 5 characters.";
     }
@@ -221,8 +217,8 @@ export default function Contact() {
       await submitContactMessage(formState);
       setSubmittedStatus({
         success: true,
-        title: "Build successful!",
-        message: "Your message has been deployed to our inbox. Let's hope it doesn't get stuck in the spam folder.",
+        title: "Message sent!",
+        message: "Thanks for reaching out! We've received your note and will get back to you soon.",
       });
       setFormState(INITIAL_FORM);
       setSelectedIssue(null);
@@ -232,7 +228,7 @@ export default function Contact() {
       console.error("Error submitting contact message:", err);
       setSubmittedStatus({
         success: false,
-        title: "Runtime error: Your message couldn't be delivered.",
+        title: "Message couldn't be sent",
         message: err.message || "Your message hasn't gone through. Please try again in a moment.",
       });
     } finally {
@@ -269,7 +265,7 @@ export default function Contact() {
         <meta property="og:title" content="Contact Abhyudaya Club | MPEC Kanpur" />
         <meta
           property="og:description"
-          content="It works on our machine. Let's see what happens on yours. Reach out to Abhyudaya Club at MPEC Kanpur."
+          content="Big idea, random doubt, or just bored? We're here. Reach out to Abhyudaya Club at MPEC Kanpur."
         />
         <meta property="og:url" content={`${SITE_URL}/contact`} />
         <meta property="og:image" content={`${SITE_URL}/abhyudaya-logo.png`} />
@@ -279,7 +275,7 @@ export default function Contact() {
         <meta name="twitter:title" content="Contact Abhyudaya Club | MPEC Kanpur" />
         <meta
           name="twitter:description"
-          content="It works on our machine. Let's see what happens on yours. Reach out to Abhyudaya Club at MPEC Kanpur."
+          content="Big idea, random doubt, or just bored? We're here. Reach out to Abhyudaya Club at MPEC Kanpur."
         />
         <meta name="twitter:image" content={`${SITE_URL}/abhyudaya-logo.png`} />
 
@@ -293,17 +289,16 @@ export default function Contact() {
         <div className="wrap contact-hero__wrap">
           <div className="contact-hero__content">
             <div className="contact-hero__badge" role="doc-subtitle">
-              <span className="contact-hero__badge-pulse" aria-hidden="true" />
               <span className="contact-hero__badge-text">ABHYUDAYA.EXE / CONTACT MODULE</span>
             </div>
 
             <h1 className="contact-hero__title">
-              It works on our machine.
-              <span className="contact-hero__subtitle">{"Let's see what happens on yours."}</span>
+              Big idea, random doubt, or just bored?
+              <span className="contact-hero__subtitle">{"We're here."}</span>
             </h1>
 
             <p className="contact-hero__lede">
-              {"Got an idea, spotted a bug, want to organize an event, or just have something to say? Don't leave us on read before we've even met."}
+              {"Got a science question, a story to tell, an event idea, spotted a bug on our website, or just want to talk? Don't overthink it. Drop us a message — no formal speech required."}
             </p>
 
             {/* Terminal Interface Console */}
@@ -319,11 +314,15 @@ export default function Contact() {
               <div className="contact-terminal__body">
                 <div className="terminal-line terminal-line--cmd">
                   <span className="terminal-prompt">root@abhyudaya:~$</span>
-                  <span className="terminal-exec">./start_conversation.sh</span>
+                  <span className="terminal-exec">./say_hello.sh</span>
                 </div>
                 <div className="terminal-line terminal-line--output">
                   <span className="terminal-out-arrow" aria-hidden="true">↳</span>
-                  <span className="terminal-out-msg">Human connection initialized. No semicolons required.</span>
+                  <span className="terminal-out-msg">Oh hey, you made it! 👋</span>
+                </div>
+                <div className="terminal-line terminal-line--output">
+                  <span className="terminal-out-arrow" aria-hidden="true">↳</span>
+                  <span className="terminal-out-msg">{"What's the scene? We're listening."}</span>
                   <span className="terminal-cursor" aria-hidden="true">_</span>
                 </div>
               </div>
@@ -428,22 +427,18 @@ export default function Contact() {
             </div>
           </aside>
 
-          {/* Right Column: CSE Contact Inquiry Form Card */}
+          {/* Right Column: Contact Inquiry Form Card */}
           <main className="join-card contact-form-card reveal">
             <div className="contact-card-header">
-              <div className="inbox-status-badge">
-                <span className="inbox-status-dot" aria-hidden="true" />
-                <span className="inbox-status-text">INBOX STATUS: AWAITING YOUR LORE</span>
-              </div>
-              <h2 className="contact-card-title">Transmit Telemetry</h2>
+              <h2 className="contact-card-title">{"What's on your mind?"}</h2>
               <p className="contact-card-sub">
-                Select an issue archetype below or jump straight into the form. All inputs are sanitized, respected, and checked by human developers.
+                {"Pick a topic or skip straight to the form. Science, literature, events, website bugs — it's all welcome."}
               </p>
             </div>
 
             {/* Interactive Issue Selector */}
             <div className="issue-selector-wrapper" role="radiogroup" aria-label="Select inquiry category">
-              <span className="issue-selector-label">SELECT ISSUE ARCHETYPE:</span>
+              <span className="issue-selector-label">Choose a topic (optional):</span>
               <div className="issue-selector-grid">
                 {ISSUE_OPTIONS.map((item) => {
                   const isSelected = selectedIssue === item.id;
@@ -456,12 +451,6 @@ export default function Contact() {
                       className={`issue-card ${isSelected ? "is-selected" : ""}`}
                       onClick={() => handleSelectIssue(item)}
                     >
-                      <div className="issue-card__top">
-                        <span className="issue-card__badge">{item.badge}</span>
-                        <span className="issue-card__indicator" aria-hidden="true">
-                          {isSelected ? "●" : "○"}
-                        </span>
-                      </div>
                       <strong className="issue-card__title">{item.label}</strong>
                       <span className="issue-card__subtitle">{item.subtitle}</span>
                     </button>
@@ -471,7 +460,6 @@ export default function Contact() {
 
               {activeReaction && (
                 <div className="issue-reaction-box" role="status" aria-live="polite">
-                  <span className="reaction-prefix">{"// Debug Advice:"}</span>
                   <p className="reaction-text">{activeReaction}</p>
                 </div>
               )}
@@ -497,7 +485,7 @@ export default function Contact() {
                       onClick={handleFormSubmit}
                       className="contact-retry-btn"
                     >
-                      Retry git push ↺
+                      Try again ↺
                     </button>
                   )}
                 </div>
@@ -508,7 +496,7 @@ export default function Contact() {
             <form onSubmit={handleFormSubmit} className="contact-form" noValidate>
               <div className="form-group form-group--name">
                 <label htmlFor="contact-name" className="form-label">
-                  <span>{"Who's behind this commit?"}</span>
+                  <span>Your name</span>
                   <span className="req" aria-hidden="true">*</span>
                 </label>
                 <input
@@ -517,7 +505,7 @@ export default function Contact() {
                   name="name"
                   value={formState.name}
                   onChange={handleInputChange}
-                  placeholder="e.g. Linus Torvalds or Anurag Verma"
+                  placeholder="e.g. Anurag Verma"
                   className={`contact-input ${errors.name ? "has-error" : ""}`}
                   aria-invalid={Boolean(errors.name)}
                   aria-describedby={errors.name ? "name-error" : undefined}
@@ -533,7 +521,7 @@ export default function Contact() {
 
               <div className="form-group form-group--email">
                 <label htmlFor="contact-email" className="form-label">
-                  <span>Where can we push our reply?</span>
+                  <span>Email address</span>
                   <span className="req" aria-hidden="true">*</span>
                 </label>
                 <input
@@ -542,7 +530,7 @@ export default function Contact() {
                   name="email"
                   value={formState.email}
                   onChange={handleInputChange}
-                  placeholder="e.g. dev@domain.com"
+                  placeholder="e.g. yourname@domain.com"
                   className={`contact-input ${errors.email ? "has-error" : ""}`}
                   aria-invalid={Boolean(errors.email)}
                   aria-describedby={errors.email ? "email-error" : undefined}
@@ -558,7 +546,7 @@ export default function Contact() {
 
               <div className="form-group form-group--phone">
                 <label htmlFor="contact-phone" className="form-label">
-                  <span>Emergency contact (optional, no viva calls)</span>
+                  <span>Phone number (optional)</span>
                   <span className="opt">Optional</span>
                 </label>
                 <input
@@ -582,7 +570,7 @@ export default function Contact() {
 
               <div className="form-group form-group--subject">
                 <label htmlFor="contact-subject" className="form-label">
-                  <span>{"What's the plot?"}</span>
+                  <span>Subject</span>
                   <span className="opt">Optional</span>
                 </label>
                 <input
@@ -591,7 +579,7 @@ export default function Contact() {
                   name="subject"
                   value={formState.subject}
                   onChange={handleInputChange}
-                  placeholder="e.g. Event Collaboration, Bug Report, Workshop..."
+                  placeholder="e.g. Event Collaboration, Bug Report, Workshop Idea..."
                   className="contact-input"
                   disabled={submitting}
                 />
@@ -599,7 +587,7 @@ export default function Contact() {
 
               <div className="form-group form-group--message form-group--full">
                 <label htmlFor="contact-message" className="form-label">
-                  <span>Drop the lore here...</span>
+                  <span>Your message</span>
                   <span className="req" aria-hidden="true">*</span>
                 </label>
                 <textarea
@@ -608,7 +596,7 @@ export default function Contact() {
                   name="message"
                   value={formState.message}
                   onChange={handleInputChange}
-                  placeholder="Explain your idea, report the bug, pitch your event, or tell us why your code worked yesterday but not today."
+                  placeholder="Explain your idea, report the bug, pitch your event, or tell us what's on your mind."
                   className={`contact-input contact-textarea ${errors.message ? "has-error" : ""}`}
                   aria-invalid={Boolean(errors.message)}
                   aria-describedby={errors.message ? "message-error" : undefined}
@@ -631,11 +619,11 @@ export default function Contact() {
                 {submitting ? (
                   <span className="btn-loading-content">
                     <span className="btn-spinner" aria-hidden="true" />
-                    <span>Compiling your message...</span>
+                    <span>Sending your message...</span>
                   </span>
                 ) : (
                   <span className="contact-submit-text">
-                    <span>git commit -m &quot;reached out&quot;</span>
+                    <span>{`git commit -m "${formState.subject || ""}"`}</span>
                     <span className="contact-submit-arrow" aria-hidden="true">
                       →
                     </span>

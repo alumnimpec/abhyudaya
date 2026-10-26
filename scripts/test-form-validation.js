@@ -9,14 +9,14 @@ function validateContactForm(formState) {
   const messageTrim = (formState.message || "").trim();
 
   if (!nameTrim) {
-    newErrors.name = "Who's authoring this commit? Full name is required.";
+    newErrors.name = "Please enter your name.";
   } else if (nameTrim.length < 2) {
     newErrors.name = "Name must be at least 2 characters.";
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailTrim) {
-    newErrors.email = "Where should we push replies? Email address is required.";
+    newErrors.email = "Please enter your email address.";
   } else if (!emailRegex.test(emailTrim)) {
     newErrors.email = "Please enter a valid email address (e.g. name@domain.com).";
   }
@@ -29,7 +29,7 @@ function validateContactForm(formState) {
   }
 
   if (!messageTrim) {
-    newErrors.message = "Error 400: Message missing. Even our AI can't guess what you're thinking.";
+    newErrors.message = "Please enter a message before sending.";
   } else if (messageTrim.length < 5) {
     newErrors.message = "Message must be at least 5 characters.";
   }
@@ -43,9 +43,9 @@ function validateContactForm(formState) {
 // Test 1: Empty form
 const emptyResult = validateContactForm({ name: "", email: "", phone: "", subject: "", message: "" });
 assert.strictEqual(emptyResult.isValid, false);
-assert.strictEqual(emptyResult.errors.name, "Who's authoring this commit? Full name is required.");
-assert.strictEqual(emptyResult.errors.email, "Where should we push replies? Email address is required.");
-assert.strictEqual(emptyResult.errors.message, "Error 400: Message missing. Even our AI can't guess what you're thinking.");
+assert.strictEqual(emptyResult.errors.name, "Please enter your name.");
+assert.strictEqual(emptyResult.errors.email, "Please enter your email address.");
+assert.strictEqual(emptyResult.errors.message, "Please enter a message before sending.");
 console.log("✓ Empty form validation test passed");
 
 // Test 2: Invalid email & short name
