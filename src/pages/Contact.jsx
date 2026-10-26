@@ -288,17 +288,13 @@ export default function Contact() {
       <header className="page-hero contact-hero" aria-label="Contact Module Hero">
         <div className="wrap contact-hero__wrap">
           <div className="contact-hero__content">
-            <div className="contact-hero__badge" role="doc-subtitle">
-              <span className="contact-hero__badge-text">ABHYUDAYA.EXE / CONTACT MODULE</span>
-            </div>
 
             <h1 className="contact-hero__title">
-              Big idea, random doubt, or just bored?
-              <span className="contact-hero__subtitle">{"We're here."}</span>
+              {"Got a question? We've got answers. (Hopefully.)"}
             </h1>
 
             <p className="contact-hero__lede">
-              {"Got a science question, a story to tell, an event idea, spotted a bug on our website, or just want to talk? Don't overthink it. Drop us a message — no formal speech required."}
+              {"Got an idea, spotted a bug, or just want to say hi? Drop us a message. No formalities required."}
             </p>
 
             {/* Terminal Interface Console */}
