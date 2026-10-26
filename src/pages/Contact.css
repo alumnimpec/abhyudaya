@@ -1,7 +1,226 @@
 /* ==========================================================================
-   Contact Page Styles — Abhyudaya Club
+   Contact Page Styles — Abhyudaya Club (CSE Themed Edition)
    Palette: "Sunrise Ascent" (Night #0d1224, Sun #eeb84a, Dawn #fbf4e8)
    ========================================================================== */
+
+/* ── Hero Section with Terminal Console ──────────────────────────────────── */
+.contact-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(238, 184, 74, 0.16), transparent 32%),
+    radial-gradient(circle at 10% 90%, rgba(69, 117, 255, 0.14), transparent 36%),
+    linear-gradient(135deg, #071120 0%, #0d1730 50%, #142244 100%);
+  color: #ffffff;
+  padding: clamp(4.5rem, 9vw, 6.5rem) 0 clamp(3.5rem, 7vw, 4.8rem);
+}
+
+.contact-hero::before {
+  content: "";
+  position: absolute;
+  width: 540px;
+  height: 540px;
+  right: -160px;
+  top: -160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(238, 184, 74, 0.18), transparent 70%);
+  pointer-events: none;
+}
+
+.contact-hero::after {
+  content: "";
+  position: absolute;
+  width: 440px;
+  height: 440px;
+  left: -140px;
+  bottom: -160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.14), transparent 70%);
+  pointer-events: none;
+}
+
+.contact-hero__wrap {
+  position: relative;
+  z-index: 2;
+}
+
+.contact-hero__content {
+  max-width: 860px;
+}
+
+/* Terminal Eyebrow Badge */
+.contact-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(238, 184, 74, 0.1);
+  border: 1px solid rgba(238, 184, 74, 0.3);
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 1.4rem;
+  backdrop-filter: blur(8px);
+}
+
+.contact-hero__badge-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #eeb84a;
+  box-shadow: 0 0 10px #eeb84a, 0 0 18px rgba(238, 184, 74, 0.6);
+  animation: terminalPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  flex-shrink: 0;
+}
+
+@keyframes terminalPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+.contact-hero__badge-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #ffd166;
+  text-transform: uppercase;
+}
+
+/* Hero Typography */
+.contact-hero__title {
+  font-family: var(--font-display, "Fraunces", serif);
+  font-size: clamp(2.4rem, 5.5vw, 4.2rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 1rem 0;
+}
+
+.contact-hero__subtitle {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  font-weight: 700;
+  font-size: clamp(1.4rem, 3.2vw, 2.2rem);
+  letter-spacing: -0.015em;
+  background: linear-gradient(135deg, #ffd166 0%, #f7a838 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.contact-hero__lede {
+  color: rgba(251, 244, 232, 0.82);
+  font-size: clamp(1rem, 1.8vw, 1.15rem);
+  line-height: 1.7;
+  max-width: 680px;
+  margin: 0 0 1.8rem 0;
+}
+
+/* ── Interactive Terminal Window Box ─────────────────────────────────────── */
+.contact-terminal {
+  background: rgba(6, 10, 22, 0.88);
+  border: 1px solid rgba(238, 184, 74, 0.24);
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 640px;
+  box-shadow: 0 14px 34px rgba(4, 8, 18, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+}
+
+.contact-terminal__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: rgba(13, 18, 36, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.terminal-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.terminal-dot--red { background: #ff5f56; }
+.terminal-dot--yellow { background: #ffbd2e; }
+.terminal-dot--green { background: #27c93f; }
+
+.contact-terminal__title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.05em;
+}
+
+.contact-terminal__body {
+  padding: 14px 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.terminal-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.terminal-line--cmd {
+  color: #fbf4e8;
+  margin-bottom: 4px;
+}
+
+.terminal-prompt {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.terminal-exec {
+  color: #ffd166;
+}
+
+.terminal-line--output {
+  color: #93c5fd;
+  font-size: 0.85rem;
+}
+
+.terminal-out-arrow {
+  color: #eeb84a;
+  font-weight: bold;
+}
+
+.terminal-out-msg {
+  color: rgba(251, 244, 232, 0.92);
+}
+
+.terminal-cursor {
+  display: inline-block;
+  color: #ffd166;
+  font-weight: bold;
+  animation: terminalBlink 1.05s infinite;
+  margin-left: 2px;
+}
+
+@keyframes terminalBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
 
 /* ── Section & Layout Structure ─────────────────────────────────────────── */
 .contact-section {
@@ -16,13 +235,13 @@
 
 .contact-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
   gap: 32px;
   align-items: start;
   scroll-margin-top: 100px;
 }
 
-/* ── Left Column: Editorial Campus & Channels Presentation ───────────────── */
+/* ── Left Column: Campus Info & Social Channels ─────────────────────────── */
 .contact-info {
   display: flex;
   flex-direction: column;
@@ -43,7 +262,6 @@
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.08);
 }
 
-/* Campus Location Card */
 .contact-location-card {
   display: flex;
   flex-direction: column;
@@ -106,7 +324,7 @@
 .contact-channel-item {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .contact-channel-divider {
@@ -144,7 +362,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .social-pill {
@@ -184,59 +402,60 @@
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
 
-/* ── Right Column: Premium Layered Navy Contact Form Panel ───────────────── */
-.join-card {
+/* ── Right Column: Premium Navy Contact Form Card ────────────────────────── */
+.contact-form-card {
   background: linear-gradient(165deg, #0b1224 0%, #101a35 45%, #152347 100%) !important;
   color: #ffffff !important;
-  padding: 30px 32px 32px 32px;
+  padding: 32px 34px 34px 34px;
   border-radius: 20px;
-  border: 1px solid rgba(238, 184, 74, 0.22);
-  box-shadow: 0 16px 36px -10px rgba(7, 13, 28, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(238, 184, 74, 0.24);
+  box-shadow: 0 18px 40px -10px rgba(7, 13, 28, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
   transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
 }
 
-.join-card:hover {
+.contact-form-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(238, 184, 74, 0.32);
-  box-shadow: 0 20px 44px -10px rgba(7, 13, 28, 0.55), 0 0 0 1px rgba(238, 184, 74, 0.15);
+  border-color: rgba(238, 184, 74, 0.34);
+  box-shadow: 0 22px 48px -10px rgba(7, 13, 28, 0.65), 0 0 0 1px rgba(238, 184, 74, 0.16);
 }
 
-/* Form Header Typography */
-.contact-card-header {
-  margin-bottom: 22px;
-}
-
-.join-card .join-badge {
+/* Status Badge */
+.inbox-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  background: rgba(238, 184, 74, 0.12) !important;
-  color: #f7d189 !important;
+  gap: 8px;
+  background: rgba(238, 184, 74, 0.12);
+  color: #ffd166;
   border: 1px solid rgba(238, 184, 74, 0.28);
-  padding: 5px 13px;
+  padding: 5px 12px;
   border-radius: 999px;
   margin-bottom: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.75rem;
-  font-family: var(--font-utility, inherit);
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.join-badge__dot {
+.inbox-status-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #eeb84a;
   box-shadow: 0 0 8px #eeb84a;
   flex-shrink: 0;
+  animation: statusPulse 1.8s infinite;
 }
 
-.contact-card-title,
-.join-card h2 {
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.contact-card-title {
   color: #ffffff !important;
   font-family: var(--font-display, "Fraunces", serif);
-  font-size: clamp(1.45rem, 2.3vw, 1.75rem);
+  font-size: clamp(1.5rem, 2.4vw, 1.85rem);
   font-weight: 700;
   letter-spacing: -0.015em;
   margin-bottom: 6px;
@@ -244,10 +463,225 @@
 }
 
 .contact-card-sub {
-  color: rgba(251, 244, 232, 0.75);
+  color: rgba(251, 244, 232, 0.78);
   font-size: 0.88rem;
   line-height: 1.5;
   margin: 0;
+}
+
+/* ── Interactive Issue Selector Cards ────────────────────────────────────── */
+.issue-selector-wrapper {
+  margin: 22px 0 20px 0;
+  padding: 16px;
+  background: rgba(6, 10, 22, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+}
+
+.issue-selector-label {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #ffd166;
+  margin-bottom: 10px;
+}
+
+.issue-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.issue-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.issue-card:hover {
+  background: rgba(26, 36, 66, 0.85);
+  border-color: rgba(238, 184, 74, 0.38);
+  transform: translateY(-2px);
+}
+
+.issue-card:focus-visible {
+  outline: 2px solid #eeb84a;
+  outline-offset: 2px;
+}
+
+.issue-card.is-selected {
+  background: rgba(238, 184, 74, 0.12);
+  border-color: #eeb84a;
+  box-shadow: 0 0 14px rgba(238, 184, 74, 0.2), inset 0 0 0 1px #eeb84a;
+}
+
+.issue-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.issue-card__badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+
+.issue-card.is-selected .issue-card__badge {
+  background: rgba(238, 184, 74, 0.24);
+  color: #ffd166;
+}
+
+.issue-card__indicator {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1;
+}
+
+.issue-card.is-selected .issue-card__indicator {
+  color: #eeb84a;
+}
+
+.issue-card__title {
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.issue-card.is-selected .issue-card__title {
+  color: #ffd166;
+}
+
+.issue-card__subtitle {
+  font-size: 0.75rem;
+  color: rgba(251, 244, 232, 0.65);
+  line-height: 1.35;
+}
+
+/* Issue Reaction Box */
+.issue-reaction-box {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(8, 14, 30, 0.95);
+  border-left: 3px solid #eeb84a;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: fadeInDown 0.25s ease;
+}
+
+.reaction-prefix {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffd166;
+}
+
+.reaction-text {
+  font-size: 0.84rem;
+  color: rgba(251, 244, 232, 0.92);
+  line-height: 1.45;
+  margin: 0;
+  font-style: italic;
+}
+
+/* ── Submission Alert Banners ────────────────────────────────────────────── */
+.contact-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  animation: fadeInDown 0.3s ease;
+}
+
+.contact-alert--success {
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: #dcfce7;
+}
+
+.contact-alert--error {
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fee2e2;
+}
+
+.contact-alert__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.contact-alert--success .contact-alert__icon {
+  background: #22c55e;
+  color: #ffffff;
+}
+
+.contact-alert--error .contact-alert__icon {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.contact-alert__content {
+  flex: 1;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.contact-alert__title {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin-bottom: 3px;
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+}
+
+.contact-alert__content p {
+  margin: 0;
+}
+
+.contact-retry-btn {
+  margin-top: 8px;
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid #ef4444;
+  color: #ffffff;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.contact-retry-btn:hover {
+  background: rgba(239, 68, 68, 0.45);
 }
 
 /* ── Contact Form Grid & Form Groups ─────────────────────────────────────── */
@@ -263,28 +697,14 @@
   min-width: 0;
 }
 
-.form-group--name {
-  grid-column: 1;
-}
-
-.form-group--email {
-  grid-column: 2;
-}
-
-.form-group--phone {
-  grid-column: 1;
-}
-
-.form-group--subject {
-  grid-column: 2;
-}
-
+.form-group--name { grid-column: 1; }
+.form-group--email { grid-column: 2; }
+.form-group--phone { grid-column: 1; }
+.form-group--subject { grid-column: 2; }
 .form-group--full,
-.contact-submit-btn {
-  grid-column: 1 / -1;
-}
+.contact-submit-btn { grid-column: 1 / -1; }
 
-/* Label Design with Clear Separation & Alignment */
+/* Labels */
 .form-label {
   display: flex;
   align-items: center;
@@ -310,14 +730,14 @@
   margin-left: auto;
 }
 
-/* ── Sophisticated Dark Input Surface, Blue-Gray Border & Gold Focus ──────── */
+/* Inputs */
 .contact-input {
   width: 100%;
   box-sizing: border-box;
   height: 46px;
   padding: 0 16px;
-  background: rgba(6, 10, 22, 0.68);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(6, 10, 22, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 10px;
   color: #ffffff;
   font-size: 0.92rem;
@@ -327,15 +747,15 @@
 }
 
 .contact-input::placeholder {
-  color: rgba(226, 232, 240, 0.42);
-  font-size: 0.88rem;
+  color: rgba(226, 232, 240, 0.4);
+  font-size: 0.86rem;
   font-weight: 400;
 }
 
 .contact-input:focus {
-  background: rgba(6, 10, 22, 0.92);
+  background: rgba(6, 10, 22, 0.95);
   border-color: #eeb84a;
-  box-shadow: 0 0 0 3px rgba(238, 184, 74, 0.16), 0 1px 3px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 3px rgba(238, 184, 74, 0.18), 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .contact-input.has-error {
@@ -348,10 +768,10 @@
   box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.22);
 }
 
-/* ── Upgraded Message Textarea ───────────────────────────────────────────── */
+/* Textarea */
 .contact-textarea {
   height: auto;
-  min-height: 140px;
+  min-height: 135px;
   max-height: 320px;
   padding: 13px 16px;
   line-height: 1.55;
@@ -362,73 +782,11 @@
   color: #fca5a5;
   font-size: 0.76rem;
   font-weight: 500;
-  margin-top: 4px;
+  margin-top: 5px;
   line-height: 1.3;
 }
 
-/* ── Submission Alert Banners ────────────────────────────────────────────── */
-.contact-alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 15px;
-  border-radius: 10px;
-  margin-bottom: 16px;
-  animation: fadeInDown 0.3s ease;
-}
-
-.contact-alert--success {
-  background: rgba(34, 197, 94, 0.16);
-  border: 1px solid rgba(74, 222, 128, 0.35);
-  color: #dcfce7;
-}
-
-.contact-alert--error {
-  background: rgba(239, 68, 68, 0.16);
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  color: #fee2e2;
-}
-
-.contact-alert__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  font-size: 0.8rem;
-  font-weight: bold;
-  flex-shrink: 0;
-}
-
-.contact-alert--success .contact-alert__icon {
-  background: #22c55e;
-  color: #ffffff;
-}
-
-.contact-alert--error .contact-alert__icon {
-  background: #ef4444;
-  color: #ffffff;
-}
-
-.contact-alert__content {
-  flex: 1;
-  font-size: 0.85rem;
-  line-height: 1.35;
-}
-
-.contact-alert__title {
-  display: block;
-  font-size: 0.88rem;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.contact-alert__content p {
-  margin: 0;
-}
-
-/* ── Signature Gold Submit Button with Animated Hover Arrow ──────────────── */
+/* ── Submit Button with Terminal Commit Aesthetics ───────────────────────── */
 .contact-submit-btn {
   margin-top: 6px;
   width: 100%;
@@ -442,9 +800,9 @@
   padding: 0 24px;
   background: linear-gradient(135deg, #f0be52 0%, #dfa52f 100%);
   color: #0c1222;
-  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-weight: 700;
-  font-size: 0.94rem;
+  font-size: 0.92rem;
   letter-spacing: 0.02em;
   border-radius: 999px;
   box-shadow: 0 4px 14px rgba(238, 184, 74, 0.28), 0 1px 2px rgba(0, 0, 0, 0.15);
@@ -496,7 +854,7 @@
 .btn-loading-content {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .btn-spinner {
@@ -514,54 +872,195 @@
   }
 }
 
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Card Footer Note */
+.contact-card-footer {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* ── FAQ Section ─────────────────────────────────────────────────────────── */
+.footer-terminal-char {
+  color: #ffd166;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.contact-card-footer-note {
+  font-size: 0.78rem;
+  color: rgba(251, 244, 232, 0.62);
+  line-height: 1.4;
+  margin: 0;
+  font-style: italic;
+}
+
+/* ── FAQ Section (CSE Accordion) ─────────────────────────────────────────── */
 .faq-card {
   background: #ffffff;
   border-radius: 20px;
-  padding: 36px 38px;
+  padding: 40px 42px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(20, 23, 43, 0.07);
 }
 
-.faq-card h2 {
-  margin-bottom: 24px;
+.faq-header {
+  margin-bottom: 28px;
 }
 
-.faq-item {
-  padding: 15px 0;
-  border-bottom: 1px solid #e5e7eb;
-  transition: padding-left 0.25s ease;
+.faq-badge {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--horizon, #7a2128);
+  background: rgba(122, 33, 40, 0.08);
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin-bottom: 8px;
 }
 
-.faq-item:hover {
-  padding-left: 6px;
+.faq-title {
+  font-family: var(--font-display, "Fraunces", serif);
+  font-size: clamp(1.6rem, 2.8vw, 2.2rem);
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px 0;
 }
 
-.faq-item:last-child {
+.faq-sub {
+  color: #64748b;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.faq-accordion {
+  display: flex;
+  flex-direction: column;
+}
+
+.faq-accordion-item {
+  border-bottom: 1px solid #e2e8f0;
+  transition: background-color 0.2s ease;
+}
+
+.faq-accordion-item:last-child {
   border-bottom: none;
 }
 
-.faq-item h3 {
-  color: #0f172a;
-  margin-bottom: 5px;
-  font-size: 1.05rem;
+.faq-accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 8px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  border-radius: 8px;
+  transition: color 0.2s ease, background 0.2s ease;
 }
 
-.faq-item p {
-  color: #64748b;
-  line-height: 1.65;
-  font-size: 0.92rem;
+.faq-accordion-trigger:hover {
+  background: rgba(241, 245, 249, 0.6);
+}
+
+.faq-accordion-trigger:focus-visible {
+  outline: 2px solid #eeb84a;
+  outline-offset: 2px;
+}
+
+.faq-accordion-q {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-utility, "Space Grotesk", sans-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.faq-accordion-item.is-open .faq-accordion-q {
+  color: #1e3a8a;
+}
+
+.faq-q-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9rem;
+  color: #eeb84a;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.faq-accordion-item.is-open .faq-q-num {
+  color: var(--horizon, #7a2128);
+}
+
+.faq-accordion-icon {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.faq-icon-line {
+  position: absolute;
+  background: #64748b;
+  border-radius: 2px;
+  transition: transform 0.25s ease, opacity 0.25s ease, background-color 0.25s ease;
+}
+
+.faq-icon-line--h {
+  top: 7px;
+  left: 0;
+  width: 16px;
+  height: 2px;
+}
+
+.faq-icon-line--v {
+  top: 0;
+  left: 7px;
+  width: 2px;
+  height: 16px;
+}
+
+.faq-accordion-item.is-open .faq-icon-line {
+  background: #1e3a8a;
+}
+
+.faq-accordion-item.is-open .faq-icon-line--v {
+  transform: rotate(90deg);
+  opacity: 0;
+}
+
+/* Smooth Accordion Expansion with CSS Grid */
+.faq-accordion-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.faq-accordion-item.is-open .faq-accordion-content {
+  grid-template-rows: 1fr;
+}
+
+.faq-accordion-inner {
+  overflow: hidden;
+}
+
+.faq-accordion-inner p {
+  padding: 0 8px 18px 36px;
+  color: #475569;
+  line-height: 1.68;
+  font-size: 0.94rem;
 }
 
 /* ── Scroll Reveal Hooks ─────────────────────────────────────────────────── */
@@ -578,10 +1077,24 @@
 
 .contact-info .reveal:nth-child(1) { transition-delay: 0s; }
 .contact-info .reveal:nth-child(2) { transition-delay: 0.08s; }
-.faq-card .reveal:nth-child(2) { transition-delay: 0s; }
-.faq-card .reveal:nth-child(3) { transition-delay: 0.08s; }
-.faq-card .reveal:nth-child(4) { transition-delay: 0.16s; }
-.faq-card .reveal:nth-child(5) { transition-delay: 0.24s; }
+
+/* FAQ accordion items are always fully visible — they must never be hidden
+   by the generic .reveal / IntersectionObserver mechanism. */
+.faq-accordion-item {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 /* Micro-Interactions & Reduced Motion Preference */
 @media (prefers-reduced-motion: reduce) {
@@ -591,15 +1104,22 @@
     transition: none;
   }
   .contact-info__block,
-  .join-card,
+  .contact-form-card,
   .social-pill,
   .contact-map__frame,
   .contact-submit-btn,
   .contact-submit-arrow,
   .contact-input,
-  .faq-item {
+  .issue-card,
+  .faq-accordion-content,
+  .faq-icon-line {
     transition: none !important;
     transform: none !important;
+    animation: none !important;
+  }
+  .contact-hero__badge-pulse,
+  .inbox-status-dot,
+  .terminal-cursor {
     animation: none !important;
   }
 }
@@ -619,11 +1139,10 @@
     padding: 20px;
     border-radius: 16px;
   }
-  .join-card {
+  .contact-form-card {
     padding: 26px 24px 28px;
     border-radius: 18px;
   }
-  /* Give Subject full-width row when space is constrained so placeholders never clip */
   .form-group--phone {
     grid-column: 1 / -1;
   }
@@ -640,6 +1159,9 @@
 
 /* Mobile & Small Tablets (768px and below) */
 @media (max-width: 768px) {
+  .contact-hero {
+    padding: 3.5rem 0 3rem;
+  }
   .contact-section {
     padding-top: 2rem;
     padding-bottom: 3rem;
@@ -659,7 +1181,7 @@
   .contact-map__frame {
     height: 180px;
   }
-  .join-card {
+  .contact-form-card {
     padding: 24px 20px 24px;
     border-radius: 16px;
   }
@@ -682,14 +1204,41 @@
   .contact-submit-btn {
     width: 100%;
     height: 48px;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
+  }
+  .faq-card {
+    padding: 28px 20px;
+    border-radius: 16px;
+  }
+  .faq-accordion-inner p {
+    padding-left: 12px;
   }
 }
 
-/* Small Mobile (480px and below, e.g. 390px, 360px) */
+/* Small Mobile (480px and below) */
 @media (max-width: 480px) {
+  .contact-hero {
+    padding: 3rem 0 2.4rem;
+  }
+  .contact-hero__badge {
+    padding: 4px 10px;
+    margin-bottom: 1rem;
+  }
+  .contact-hero__badge-text {
+    font-size: 0.72rem;
+  }
+  .contact-terminal__body {
+    padding: 10px 12px;
+    font-size: 0.78rem;
+  }
+  .terminal-line--cmd {
+    font-size: 0.8rem;
+  }
+  .issue-selector-grid {
+    grid-template-columns: 1fr;
+  }
   .contact-info__block,
-  .join-card,
+  .contact-form-card,
   .faq-card {
     padding: 20px 16px 22px;
     border-radius: 14px;
@@ -697,13 +1246,12 @@
   .contact-location-title {
     font-size: 1.05rem;
   }
-  .contact-card-title,
-  .join-card h2 {
+  .contact-card-title {
     font-size: 1.35rem;
   }
   .contact-card-sub {
     font-size: 0.84rem;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
   }
   .contact-map__frame {
     height: 165px;
@@ -719,7 +1267,7 @@
   }
   .contact-submit-btn {
     height: 46px;
-    font-size: 0.92rem;
+    font-size: 0.88rem;
   }
   .contact-info__socials {
     gap: 7px;
@@ -727,5 +1275,8 @@
   .social-pill {
     padding: 6px 12px;
     font-size: 0.8rem;
+  }
+  .faq-accordion-q {
+    font-size: 0.96rem;
   }
 }
