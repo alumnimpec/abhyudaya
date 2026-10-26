@@ -360,7 +360,9 @@ export default function Contact() {
             {/* Direct Inquiries & Social Channels Card */}
             <div className="contact-info__block contact-channels-card reveal">
               <div className="contact-channel-item">
-                <p className="eyebrow contact-eyebrow">📧 Direct Email Channel</p>
+                <h2 className="contact-email-heading">Got a question? Email us.</h2>
+                <p className="contact-email-desc">We actually read our emails. Usually between classes.</p>
+                <p className="contact-eyebrow" style={{ marginTop: "10px" }}>DROP US A MAIL</p>
                 <a
                   href={`mailto:${socials.email}`}
                   className="contact-info__email"
@@ -368,13 +370,13 @@ export default function Contact() {
                 >
                   {socials.email}
                 </a>
-                <span className="contact-response-badge">Avg. response ping: 24–48 hours</span>
+                <span className="contact-response-badge">Replies usually take 24–48 hours. Unless assignments have other plans.</span>
               </div>
 
               <div className="contact-channel-divider" />
 
               <div className="contact-channel-item">
-                <p className="eyebrow contact-eyebrow">🌐 Social Endpoints</p>
+                <p className="contact-social-intro">Stalking us on socials is also acceptable.</p>
                 <div className="contact-info__socials">
                   <a
                     href={socials.instagram}
@@ -382,7 +384,7 @@ export default function Contact() {
                     rel="noopener noreferrer"
                     className="social-pill social-pill--instagram"
                   >
-                    Instagram
+                    Instagram ↗
                   </a>
                   <a
                     href={socials.linkedin}
@@ -390,7 +392,7 @@ export default function Contact() {
                     rel="noopener noreferrer"
                     className="social-pill social-pill--linkedin"
                   >
-                    LinkedIn
+                    LinkedIn ↗
                   </a>
                   {socials.twitter && (
                     <a
